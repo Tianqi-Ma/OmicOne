@@ -38,7 +38,8 @@ app_server <- function(input, output, session) {
     do.call(bslib::navset_hidden, c(list(id = "steps"), panels))
   })
 
-  # Left navigator: grouped, status-coloured; empty on the landing page.
+  # Left navigator: collapsible phase groups, status-coloured; empty on the
+  # landing page. Only the current step's group (and the first) stays expanded.
   output$step_nav <- shiny::renderUI({
     if (is.null(rv$omics)) {
       return(shiny::div(class = "omicone-status-empty",
@@ -51,19 +52,32 @@ app_server <- function(input, output, session) {
     children <- list()
     for (ph in phase_order_for(rv$omics)) {
       lab <- phases[[ph]]
-      children[[length(children) + 1]] <-
-        shiny::div(class = "omicone-phase", i18n(lab$en, lab$zh))
-      for (s in Filter(function(x) identical(x$phase, ph), steps)) {
+      ph_steps <- Filter(function(x) identical(x$phase, ph), steps)
+      items <- lapply(ph_steps, function(s) {
         state <- if (identical(s$v, current)) "current"
                  else if (isTRUE(status[[s$v]])) "done" else "todo"
-        children[[length(children) + 1]] <- shiny::tags$a(
+        shiny::tags$a(
           class = paste("omicone-navitem", state),
           onclick = sprintf("Shiny.setInputValue('goto','%s',{priority:'event'})", s$v),
           shiny::span(class = "omicone-navdot"),
           shiny::span(class = "omicone-navnum", s$n),
           shiny::span(class = "omicone-navlabel", i18n(s$en, s$zh))
         )
-      }
+      })
+      n_done <- sum(vapply(ph_steps, function(s) isTRUE(status[[s$v]]), logical(1)))
+      has_current <- any(vapply(ph_steps, function(s) identical(s$v, current),
+                                logical(1)))
+      children[[length(children) + 1]] <- shiny::tags$details(
+        class = "omicone-phasegroup",
+        open = if (has_current || !length(children)) NA else NULL,
+        shiny::tags$summary(
+          class = "omicone-phase",
+          i18n(lab$en, lab$zh),
+          shiny::span(class = "omicone-phase-count",
+                      sprintf("%d/%d", n_done, length(ph_steps)))
+        ),
+        items
+      )
     }
     shiny::div(class = "omicone-nav", children)
   })

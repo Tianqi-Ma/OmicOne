@@ -16,8 +16,22 @@
   interaction and oncodrive plots with genes tested. The lollipop plot repels
   labels (berryFunctions) and rotates them vertical when the labelled
   positions are densely packed, so hotspots like TP53 stay readable.
+- **Plot text is larger overall**: the cohort-summary dashboard and every
+  maftools plot without its own font argument get a base-graphics text boost
+  (`with_text_boost()`), so axis and title text stays legible on wide
+  browser panels.
+- **Workspace layout polish**: the "What is this step?" explainer is now a
+  full-width strip above the workspace instead of being squeezed into the
+  280 px control rail; the left navigator's phases collapse into expandable
+  groups with a done-count badge (only the current phase stays open); the
+  nested tab card inside the plot area is flattened (no card-in-card
+  borders); summary pills and the export row are visually quieter (the
+  export row fades in on hover).
 
 ## Fixed
+- **Export row alignment**: the DPI label is now an inline unit next to its
+  field, so the download button, format selector and DPI input sit on one
+  baseline.
 - **Mutational signatures run end-to-end** (BSgenome.Hsapiens.UCSC.hg19 + NMF).
   Two environment pitfalls are worked around in `wes_signatures()`: NMF 0.28's
   internal `getGeneric("seed")` returns NULL once the Bioconductor stack is

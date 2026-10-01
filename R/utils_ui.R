@@ -89,7 +89,9 @@ label_with_help <- function(label_en, tip_en, label_zh = label_en, tip_zh = tip_
 #' Plot-first step container: narrow control rail + large preview
 #'
 #' @param title Bilingual list(en=, zh=) or string: the step title (header).
-#' @param explainer An [explainer_card()] (collapsed), or NULL.
+#' @param explainer An [explainer_card()] (collapsed). Rendered as a full-width
+#'   strip between the header and the workspace, so long prose is never
+#'   squeezed into the narrow control rail.
 #' @param controls Tag list of inputs + the Run button (goes in the left rail).
 #' @param summary A UI output slot for the slim result summary (header strip).
 #' @param preview A UI output slot for the large preview plot(s).
@@ -105,11 +107,11 @@ step_container <- function(title, explainer, controls, summary, preview,
                  shiny::span(class = "omicone-steptitle", ttl),
                  shiny::div(class = "omicone-summarystrip", summary))
     ),
+    if (!is.null(explainer)) explainer,
     bslib::layout_sidebar(
       sidebar = bslib::sidebar(
         width = rail_width, open = "open", position = "left",
-        if (!is.null(explainer)) explainer,
-        controls
+        shiny::div(class = "omicone-rail", controls)
       ),
       shiny::div(class = "omicone-plotwrap", preview)
     )
