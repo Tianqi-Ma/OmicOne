@@ -109,8 +109,9 @@ mod_wes_summary_server <- function(id, rv, log_rv) {
                                addStat = if (identical(o$stat, "none")) NULL else o$stat,
                                dashboard = o$dashboard, titvRaw = FALSE,
                                top = o$top,
-                               fs = adaptive_cex(n_samples, n_ref = 60,
-                                                 lo = 0.75, hi = 1.05))
+                               fs = adaptive_cex(n_samples, base = 1.2, n_ref = 200,
+                                                 lo = 1.0, hi = 1.25),
+                               textSize = 1.1, titleSize = c(1.25, 1.05))
     }
     output$plot <- render_base_plot(draw_summary)
     register_figure_download(output, input, "plot", draw_summary,

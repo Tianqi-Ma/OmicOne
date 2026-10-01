@@ -64,11 +64,14 @@ preview_plot_ui <- function(id, height = "100%", download = FALSE) {
                             class = "btn-sm"),
       shiny::selectInput(paste0(id, "_dlfmt"), NULL,
                          c("PNG" = "png", "JPEG" = "jpg", "PDF (vector)" = "pdf"),
-                         selectize = FALSE, width = "120px"),
+                         selectize = FALSE, width = "118px"),
       shiny::conditionalPanel(
         sprintf("input['%s'] != 'pdf'", paste0(id, "_dlfmt")),
-        shiny::numericInput(paste0(id, "_dpi"), "DPI", value = 300,
-                            min = 72, max = 1200, step = 50, width = "96px"))
+        shiny::div(class = "omicone-fig-dl-dpi",
+                   shiny::tags$span("DPI", class = "omicone-fig-dl-unit"),
+                   shiny::numericInput(paste0(id, "_dpi"), NULL, value = 300,
+                                       min = 72, max = 1200, step = 50,
+                                       width = "88px")))
     )
   )
 }
@@ -139,6 +142,25 @@ adaptive_cex <- function(n, base = 1, n_ref = 20, lo = 0.55, hi = 1.25) {
   n <- suppressWarnings(as.numeric(n %||% NA))
   if (length(n) != 1 || !is.finite(n) || n <= 0) return(base)
   max(lo, min(hi, base * sqrt(n_ref / n)))
+}
+
+#' Boost base-graphics text inside a draw closure
+#'
+#' maftools' absolute cex defaults assume a small device; on a full-width
+#' browser panel they render tiny. This wraps a draw function with a temporary
+#' `par()` bump of axis / label / title text sizes. Functions that set their
+#' own cex values internally keep them (explicit values win over `par`).
+#' @param draw_fn Zero-argument draw function.
+#' @param cex Target axis text size (labels and titles slightly larger).
+#' @keywords internal
+with_text_boost <- function(draw_fn, cex = 1.15) {
+  force(draw_fn); force(cex)
+  function() {
+    op <- graphics::par(cex.axis = cex, cex.lab = cex * 1.05,
+                        cex.main = cex * 1.1, cex.sub = cex)
+    on.exit(graphics::par(op), add = TRUE)
+    draw_fn()
+  }
 }
 
 #' Render a scop/ggplot/ComplexHeatmap object to a Shiny plot output

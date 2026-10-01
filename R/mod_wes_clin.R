@@ -120,29 +120,29 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
       )
     })
 
-    draw_enr <- function() {
+    draw_enr <- with_text_boost(function() {
       shiny::req(res$ran)
       if (is.null(res$enr)) {
         stop("No clinical feature selected. Attach a clinical table on the Import step to use this tab.")
       }
       maftools::plotEnrichmentResults(enrich_res = res$enr, pVal = res$pval)
-    }
+    })
     output$enr <- render_base_plot(draw_enr)
     register_figure_download(output, input, "enr", draw_enr, "wes_enrichment",
                              width = 10, height = 7)
 
-    draw_path <- function() {
+    draw_path <- with_text_boost(function() {
       shiny::req(rv$maf, res$ran)
       wes_pathways(rv$maf)
-    }
+    })
     output$path <- render_base_plot(draw_path)
     register_figure_download(output, input, "path", draw_path, "wes_pathways",
                              width = 10, height = 7)
 
-    draw_drug <- function() {
+    draw_drug <- with_text_boost(function() {
       shiny::req(rv$maf, res$ran)
-      maftools::drugInteractions(maf = rv$maf, fontSize = 0.75)
-    }
+      maftools::drugInteractions(maf = rv$maf, fontSize = 0.95)
+    })
     output$drug <- render_base_plot(draw_drug)
     register_figure_download(output, input, "drug", draw_drug, "wes_drugs",
                              width = 10, height = 8)

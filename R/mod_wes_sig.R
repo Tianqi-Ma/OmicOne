@@ -115,16 +115,16 @@ mod_wes_sig_server <- function(id, rv, log_rv) {
       )
     })
 
-    draw_sig <- function() {
+    draw_sig <- with_text_boost(function() {
       shiny::req(res$sig)
       maftools::plotSignatures(nmfRes = res$sig, title_size = 1.0,
                                sig_db = "SBS")
-    }
+    })
     output$sig <- render_base_plot(draw_sig)
     register_figure_download(output, input, "sig", draw_sig, "wes_signatures",
                              width = 11, height = function() max(4, 2 + 1.6 * res$n))
 
-    draw_apo <- function() {
+    draw_apo <- with_text_boost(function() {
       shiny::req(res$tnm)
       msg <- tryCatch({ maftools::plotApobecDiff(tnm = res$tnm, maf = rv$maf); NULL },
                       error = function(e) conditionMessage(e))
@@ -134,7 +134,7 @@ mod_wes_sig_server <- function(id, rv, log_rv) {
         }
         stop(msg)
       }
-    }
+    })
     output$apo <- render_base_plot(draw_apo)
     register_figure_download(output, input, "apo", draw_apo, "wes_apobec",
                              width = 10, height = 7)

@@ -152,14 +152,14 @@ mod_wes_lolli_server <- function(id, rv, log_rv) {
         span <- if (length(pos) >= 2) diff(range(pos)) + 1 else Inf
         dense <- length(pos) >= 12 && (length(pos) / span) > 0.04
       }
-      fs <- adaptive_cex(n_lab, n_ref = 10, lo = 0.65, hi = 1.3)
+      fs <- adaptive_cex(n_lab, n_ref = 14, lo = 0.75, hi = 1.45)
       args <- list(maf = rv$maf, gene = c0$gene, showMutationRate = c0$rate,
                    repel = TRUE,
                    labPosSize = round(fs, 2),
-                   legendTxtSize = round(max(0.8, min(1, fs)), 2),
-                   axisTextSize = rep(round(max(0.9, min(1.1, fs)), 2), 2),
-                   domainLabelSize = round(max(0.7, min(0.9, fs)), 2),
-                   titleSize = c(1.05, 1))
+                   legendTxtSize = round(max(0.95, min(1.15, fs)), 2),
+                   axisTextSize = rep(round(max(1.0, min(1.25, fs)), 2), 2),
+                   domainLabelSize = round(max(0.85, min(1.0, fs)), 2),
+                   titleSize = c(1.15, 1.0))
       if (dense) args$labPosAngle <- 90
       if (!is.null(c0$aa)) args$AACol <- c0$aa
       if (c0$label) args$labelPos <- "all"

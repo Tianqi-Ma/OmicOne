@@ -155,8 +155,8 @@ mod_wes_onco_server <- function(id, rv, log_rv) {
       n_genes <- if (is.null(c0$genes)) c0$top else length(c0$genes)
       args <- list(maf = rv$maf, draw_titv = c0$titv, showTumorSampleBarcodes = FALSE,
                    removeNonMutated = TRUE,
-                   fontSize = adaptive_cex(n_genes, base = 0.9, n_ref = 20,
-                                           lo = 0.45, hi = 1))
+                   fontSize = adaptive_cex(n_genes, base = 1.0, n_ref = 20,
+                                           lo = 0.7, hi = 1.15))
       if (is.null(c0$genes)) args$top <- c0$top else args$genes <- c0$genes
       if (length(c0$clin)) {
         args$clinicalFeatures <- c0$clin

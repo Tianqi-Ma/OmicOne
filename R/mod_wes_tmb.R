@@ -114,15 +114,15 @@ mod_wes_tmb_server <- function(id, rv, log_rv) {
       )
     })
 
-    draw_tmb <- function() {
+    draw_tmb <- with_text_boost(function() {
       shiny::req(rv$maf, res$df)
       maftools::tmb(maf = rv$maf, captureSize = res$capture, logScale = res$log)
-    }
+    })
     output$plot <- render_base_plot(draw_tmb)
     register_figure_download(output, input, "plot", draw_tmb, "wes_tmb",
                              width = 10, height = 7)
 
-    draw_tcga <- function() {
+    draw_tcga <- with_text_boost(function() {
       shiny::req(rv$maf, res$df)
       lab <- rv$maf_source %||% "This cohort"
       lab <- sub("\\.(maf|maf\\.gz|txt|tsv|csv)$", "", basename(lab),
@@ -132,8 +132,9 @@ mod_wes_tmb_server <- function(id, rv, log_rv) {
       if (!nzchar(lab)) lab <- "This cohort"
       if (nchar(lab) > 18) lab <- paste0(substr(lab, 1, 17), "~")
       maftools::tcgaCompare(maf = rv$maf, cohortName = lab,
-                            capture_size = res$capture, logscale = res$log)
-    }
+                            capture_size = res$capture, logscale = res$log,
+                            cohortFontSize = 1.0, axisFontSize = 1.15)
+    })
     output$tcga <- render_base_plot(draw_tcga)
     register_figure_download(output, input, "tcga", draw_tcga,
                              "wes_tmb_vs_tcga", width = 12, height = 8)

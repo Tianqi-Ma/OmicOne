@@ -135,30 +135,30 @@ mod_wes_titv_server <- function(id, rv, log_rv) {
       )
     })
 
-    draw_titv <- function() {
+    draw_titv <- with_text_boost(function() {
       shiny::req(res$titv)
       maftools::plotTiTv(res = res$titv)
-    }
+    })
     output$titv <- render_base_plot(draw_titv)
     register_figure_download(output, input, "titv", draw_titv, "wes_titv",
                              width = 9, height = 6)
 
-    draw_vaf <- function() {
+    draw_vaf <- with_text_boost(function() {
       shiny::req(rv$maf, res$cfg)
       if (is.null(res$cfg$vaf)) {
         stop("No VAF column selected. Pick one in the control panel, or this MAF does not carry allele frequencies.")
       }
       maftools::plotVaf(maf = rv$maf, vafCol = res$cfg$vaf)
-    }
+    })
     output$vaf <- render_base_plot(draw_vaf)
     register_figure_download(output, input, "vaf", draw_vaf, "wes_vaf",
                              width = 10, height = 7)
 
-    draw_rain <- function() {
+    draw_rain <- with_text_boost(function() {
       shiny::req(rv$maf, res$cfg, res$cfg$tsb)
       maftools::rainfallPlot(maf = rv$maf, tsb = res$cfg$tsb,
                              detectChangePoints = res$cfg$cp, pointSize = 0.6)
-    }
+    })
     output$rain <- render_base_plot(draw_rain)
     register_figure_download(output, input, "rain", draw_rain, "wes_rainfall",
                              width = 12, height = 6)

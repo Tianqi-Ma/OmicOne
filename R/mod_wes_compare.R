@@ -148,18 +148,18 @@ mod_wes_compare_server <- function(id, rv, log_rv) {
       )
     })
 
-    draw_forest <- function() {
+    draw_forest <- with_text_boost(function() {
       shiny::req(res$cmp)
       maftools::forestPlot(mafCompareRes = res$cmp$res, pVal = res$pval)
-    }
+    })
     output$forest <- render_base_plot(draw_forest)
     register_figure_download(output, input, "forest", draw_forest,
                              "wes_forest", width = 9, height = 8)
 
-    draw_cobar <- function() {
+    draw_cobar <- with_text_boost(function() {
       c0 <- res$cmp; shiny::req(c0)
       maftools::coBarplot(m1 = c0$m1, m2 = c0$m2, m1Name = res$l1, m2Name = res$l2)
-    }
+    })
     output$cobar <- render_base_plot(draw_cobar)
     register_figure_download(output, input, "cobar", draw_cobar,
                              "wes_cobarplot", width = 10, height = 8)

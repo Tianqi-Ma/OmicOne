@@ -128,10 +128,10 @@ mod_wes_hetero_server <- function(id, rv, log_rv) {
       )
     })
 
-    draw_het <- function() {
+    draw_het <- with_text_boost(function() {
       shiny::req(res$het)
       maftools::plotClusters(clusters = res$het, tsb = res$sample)
-    }
+    })
     output$plot <- render_base_plot(draw_het)
     register_figure_download(output, input, "plot", draw_het,
                              "wes_heterogeneity", width = 10, height = 7)
