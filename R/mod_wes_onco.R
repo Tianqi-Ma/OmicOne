@@ -29,6 +29,15 @@ mod_wes_onco_ui <- function(id) {
             colour the bar above the plot by subtype, sex, treatment, and tick
             <b>sort by annotation</b> to group samples by it.",
       zh = "先用 <b>Top N</b> 基因。有了假设之后，改为粘贴具体的<b>基因列表</b>。加上<b>临床注释</b>可以按亚型、性别、治疗给顶部的注释条着色，勾选<b>按注释排序</b>可让样本按注释分组。"),
+    read = list(
+      en = "Each row is a gene, each column a sample; a coloured tile is a
+            mutation, its colour the consequence (multi-hit samples stack two
+            colours). Bars on top count mutations per sample; bars on the right
+            count mutated samples per gene, with the percentage beside. Samples
+            are sorted so co-mutation and mutual exclusivity show up as a
+            staircase — genes that tile the columns without overlapping rarely
+            act in the same patient.",
+      zh = "每行一个基因、每列一个样本；有色格子代表突变，颜色标记后果（多重打击的样本会叠加两种颜色）。顶部柱条是每样本突变数；右侧柱条是每基因的突变样本数及百分比。样本经过排序，使共突变与互斥呈现为阶梯状——铺满各列却互不重叠的基因，很少在同一患者中同时起作用。"),
     example = list(
       en = "Top 20 genes in TCGA LAML, annotated by
                <code>FAB_classification</code>: the M3 samples separate out on
@@ -60,10 +69,14 @@ mod_wes_onco_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Oncoplot", zh = "Oncoplot"),
+    subtitle  = list(en = "Gene × sample mutation matrix — the waterfall figure.",
+                     zh = "基因 × 样本突变矩阵——瀑布图。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("plot"), download = TRUE)
+    preview   = preview_plot_ui(ns("plot"), download = TRUE,
+                                guide = list(en = "The cohort's oncoplot (waterfall) will be drawn here.",
+                                             zh = "运行后，这里将绘制该队列的 Oncoplot（瀑布图）。"))
   )
 }
 

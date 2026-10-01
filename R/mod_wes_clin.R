@@ -30,6 +30,15 @@ mod_wes_clin_ui <- function(id) {
             dropdown is empty, load a clinical table on the Import step. Pathways
             and drugs need no clinical data at all.",
       zh = "富集分析需要在导入时附带<b>临床列</b>——如果下拉框是空的，请在导入步骤加载临床表。通路和药物分析不需要任何临床数据。"),
+    read = list(
+      en = "<b>Enrichment</b>: one bar per gene whose mutation frequency differs
+            across the clinical groups — the longer the bar, the smaller the
+            p-value; bars past the line survive your cutoff. <b>Pathways</b>:
+            the share of samples hitting each of the ten canonical oncogenic
+            pathways, counting any member gene. <b>Drugs</b>: mutated genes with
+            known drug interactions, ranked by how many compounds target them —
+            the top of that list is where repurposing hypotheses start.",
+      zh = "<b>富集</b>：每根条代表一个突变频率在临床分组间有差异的基因——条越长 p 值越小；超过竖线的基因通过了你的阈值。<b>通路</b>：命中十条经典致癌通路各自的样本占比（任一成员基因命中即计入）。<b>药物</b>：具有已知药物相互作用的突变基因，按对应化合物数量排序——排在前列的就是老药新用假设的起点。"),
     example = list(
       en = "In TCGA LAML, enrichment on <code>FAB_classification</code> recovers
                the M3-specific mutation pattern without being told which samples
@@ -45,11 +54,16 @@ mod_wes_clin_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Clinical / pathway / drug", zh = "临床 / 通路 / 药物"),
+    subtitle  = list(en = "Tie mutations to clinical groups, pathways, and drugs.",
+                     zh = "把突变与临床分组、通路和药物联系起来。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Clinical enrichment", "临床富集"), preview_plot_ui(ns("enr"), download = TRUE)),
+      bslib::nav_panel(i18n("Clinical enrichment", "临床富集"),
+                       preview_plot_ui(ns("enr"), download = TRUE,
+                                       guide = list(en = "Genes enriched in one clinical group will be drawn here.",
+                                                    zh = "运行后，这里将绘制在某个临床分组中富集的基因。"))),
       bslib::nav_panel(i18n("Pathways", "通路"),   preview_plot_ui(ns("path"), download = TRUE)),
       bslib::nav_panel(i18n("Drugs", "药物"),      preview_plot_ui(ns("drug"), download = TRUE)),
       bslib::nav_panel(i18n("Enrichment table", "富集结果表"), shiny::uiOutput(ns("tbl_slot")))

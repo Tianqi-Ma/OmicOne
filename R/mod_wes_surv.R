@@ -33,6 +33,14 @@ mod_wes_surv_ui <- function(id) {
             table attached to the MAF, or from a cohort you already loaded in the
             single-cell <b>Clinical &amp; survival</b> step.",
       zh = "先从单个基因开始。选择多个基因时会作为一个基因集处理——<i>突变型</i>指其中<b>任意一个</b>发生突变，这正适合用于通路层面的分析。生存数据来自随 MAF 附带的临床表，或你已在单细胞<b>临床与生存</b>步骤中加载的队列。"),
+    read = list(
+      en = "Each curve is the fraction of patients still event-free over time;
+            every step down is an event. The shaded band is the 95% CI — where
+            two bands overlap heavily, the visual gap is noise. The p-value is
+            the log-rank test over the whole curve, and the risk table below
+            shows how many patients each arm still has late on: a separation
+            resting on five patients is fragile, whatever the p-value says.",
+      zh = "每条曲线是随时间推移仍未发生事件的患者比例；每一次下降就是一个事件。阴影带为 95% 置信区间——若两条带大面积重叠，视觉上的差距只是噪声。p 值来自对整条曲线的 log-rank 检验；图下方的风险人数表显示各组在晚期时间点的剩余人数：如果曲线分离只靠五名患者支撑，无论 p 值多小都不牢靠。"),
     example = list(
       en = "In TCGA LAML, <code>TP53</code> mutants have clearly worse overall
                survival; <code>DNMT3A</code> is the classic borderline case.",
@@ -47,11 +55,16 @@ mod_wes_surv_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Mutation vs survival", zh = "突变与预后"),
+    subtitle  = list(en = "Kaplan-Meier curves for mutant versus wild-type.",
+                     zh = "突变型与野生型的 Kaplan-Meier 生存曲线。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Kaplan-Meier", "生存曲线"), preview_plot_ui(ns("km"), download = TRUE)),
+      bslib::nav_panel(i18n("Kaplan-Meier", "生存曲线"),
+                       preview_plot_ui(ns("km"), download = TRUE,
+                                       guide = list(en = "The Kaplan-Meier curves will be drawn here.",
+                                                    zh = "运行后，这里将绘制 Kaplan-Meier 生存曲线。"))),
       bslib::nav_panel(i18n("Cohort", "队列表"), shiny::uiOutput(ns("tbl_slot")))
     )
   )

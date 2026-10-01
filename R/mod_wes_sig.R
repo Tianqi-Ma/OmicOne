@@ -32,6 +32,15 @@ mod_wes_sig_ui <- function(id) {
             large download. Then pick how many signatures to extract: start at 3
             and raise it only if the cohort is large.",
       zh = "该步骤需要参考基因组的 <b>BSgenome</b> 包以查询侧翼碱基——请先安装 <code>BSgenome.Hsapiens.UCSC.hg19</code>（或 hg38），这是个较大的下载。然后选择要提取的特征数：从 3 开始，只有队列很大时才增加。"),
+    read = list(
+      en = "Left: each extracted signature's 96-category fingerprint. Right: how
+            much of each signature every sample carries — the stacked bars
+            should differ between samples, otherwise one process dominates the
+            cohort. The <b>COSMIC match</b> tab names each signature: SBS1 is
+            ageing, SBS4 tobacco, SBS2/SBS13 APOBEC, SBS6/SBS15 mismatch-repair
+            deficiency. Cosine similarity above ~0.85 is a confident match;
+            below ~0.6 the label is a guess.",
+      zh = "左图：每个提取特征的 96 类指纹。右图：每个样本携带各特征的比例——堆叠条应在样本间有差异，否则说明该队列由单一突变过程主导。<b>COSMIC 匹配</b>页签给出每个特征的名称：SBS1 为衰老，SBS4 为烟草，SBS2/SBS13 为 APOBEC，SBS6/SBS15 为错配修复缺陷。余弦相似度高于约 0.85 才算可信匹配；低于 0.6 时标签仅供参考。"),
     example = list(
       en = "A cohort dominated by <b>SBS4</b> is a smoking cohort; <b>SBS2/SBS13</b>
                together mean APOBEC activity; <b>SBS6/SBS15</b> point at mismatch
@@ -54,11 +63,16 @@ mod_wes_sig_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Mutational signatures", zh = "突变特征"),
+    subtitle  = list(en = "Decompose the mutation spectrum into known mutational processes.",
+                     zh = "把突变谱分解为已知的突变过程。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Signatures", "特征谱"), preview_plot_ui(ns("sig"), download = TRUE)),
+      bslib::nav_panel(i18n("Signatures", "特征谱"),
+                       preview_plot_ui(ns("sig"), download = TRUE,
+                                       guide = list(en = "The extracted signature fingerprints and per-sample exposures will be drawn here.",
+                                                    zh = "运行后，这里将绘制提取出的特征指纹与各样本的暴露量。"))),
       bslib::nav_panel(i18n("COSMIC match", "COSMIC 匹配"), shiny::uiOutput(ns("tbl_slot"))),
       bslib::nav_panel(i18n("APOBEC enrichment", "APOBEC 富集"), preview_plot_ui(ns("apo"), download = TRUE))
     )

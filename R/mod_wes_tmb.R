@@ -31,6 +31,15 @@ mod_wes_tmb_ui <- function(id) {
             <b>vs TCGA</b> tab puts your cohort's median next to all 33 TCGA
             cohorts, so you can tell a genuinely high burden from an ordinary one.",
       zh = "把<b>捕获区域大小</b>设为你所用试剂盒的实际目标区域（Mb）——默认 50 Mb 是全外显子常见值。设错会让所有数值等比例偏移，请查阅试剂盒文档。<b>vs TCGA</b> 页签把本队列的中位 TMB 与全部 33 个 TCGA 队列并列展示，可以据此判断突变负荷是真的偏高还是普通水平。"),
+    read = list(
+      en = "Each point is a sample's non-synonymous mutations divided by the
+            capture size. The y-axis is log-scaled: small visual gaps are big
+            fold differences. As a rule of thumb, ~10 mut/Mb is the cutoff
+            clinics use for likely immunotherapy response — most leukaemias sit
+            far below it. The <b>vs TCGA</b> tab puts your cohort's median
+            beside all 33 TCGA cohorts, so you can see whether it runs hot or
+            cold for its tissue type.",
+      zh = "每个点是一个样本的非同义突变数除以捕获区域大小。纵轴为对数刻度：图上一小段距离代表很大的倍数差异。经验上，约 10 mut/Mb 是临床用于预测免疫治疗响应的阈值——多数白血病远低于此。<b>对比 TCGA</b> 页签把本队列的中位数与全部 33 个 TCGA 队列并排，一眼看出它在同类肿瘤中偏高还是偏低。"),
     example = list(
       en = "Agilent SureSelect V6 covers ~60 Mb; IDT xGen Exome ~39 Mb; a
                targeted 500-gene panel might be ~1.5 Mb.",
@@ -47,11 +56,16 @@ mod_wes_tmb_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Tumour mutational burden", zh = "肿瘤突变负荷 TMB"),
+    subtitle  = list(en = "Mutations per megabase, benchmarked against 33 TCGA cohorts.",
+                     zh = "每兆碱基的突变数，并与 33 个 TCGA 队列对照。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Distribution", "分布图"), preview_plot_ui(ns("plot"), download = TRUE)),
+      bslib::nav_panel(i18n("Distribution", "分布图"),
+                       preview_plot_ui(ns("plot"), download = TRUE,
+                                       guide = list(en = "The per-sample TMB distribution will be drawn here.",
+                                                    zh = "运行后，这里将绘制每样本 TMB 分布图。"))),
       bslib::nav_panel(i18n("vs TCGA", "对比 TCGA"),  preview_plot_ui(ns("tcga"), download = TRUE)),
       bslib::nav_panel(i18n("Per sample", "各样本"),   shiny::uiOutput(ns("tbl_slot")))
     )

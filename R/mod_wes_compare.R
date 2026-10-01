@@ -31,6 +31,14 @@ mod_wes_compare_ui <- function(id) {
             spurious hits. The co-barplot next to the forest plot shows the raw
             frequencies the test was run on.",
       zh = "提高<b>最小突变数</b>，避免检验只在一两个患者中突变的基因——在检验几百个基因的情况下，这类基因很容易出现假阳性。森林图旁的并排柱状图展示了检验所依据的原始频率。"),
+    read = list(
+      en = "The forest plot gives one row per gene: the dot is the odds ratio,
+            the whiskers its 95% CI. Right of 1 means mutated more often in the
+            first group; rows whose whiskers do not cross 1 are your hits. The
+            <b>Frequencies</b> tab shows the same genes as side-by-side bars, so
+            you can see the raw percentages behind each odds ratio — a
+            significant result built on 2% versus 0% is rarely worth much.",
+      zh = "森林图每行一个基因：圆点是比值比，横须是 95% 置信区间。1 以右表示在第一组中突变更多；横须不跨过 1 的行才是阳性结果。<b>频率对比</b>页签用并排柱条展示同样的基因，让你看到比值比背后的原始百分比——建立在 2% 对 0% 上的显著结果通常没多少价值。"),
     example = list(
       en = "Comparing <code>FAB_classification</code> M0 against M3 in TCGA LAML
                recovers the known M3 pattern.",
@@ -51,11 +59,16 @@ mod_wes_compare_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Cohort comparison", zh = "队列比较"),
+    subtitle  = list(en = "Fisher tests for genes that differ between two groups.",
+                     zh = "用 Fisher 检验找出两组间突变频率不同的基因。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Forest plot", "森林图"), preview_plot_ui(ns("forest"), download = TRUE)),
+      bslib::nav_panel(i18n("Forest plot", "森林图"),
+                       preview_plot_ui(ns("forest"), download = TRUE,
+                                       guide = list(en = "Odds ratios for group-biased genes will be drawn here.",
+                                                    zh = "运行后，这里将绘制偏向某一组的基因的森林图。"))),
       bslib::nav_panel(i18n("Frequencies", "频率对比"), preview_plot_ui(ns("cobar"), download = TRUE)),
       bslib::nav_panel(i18n("Results", "结果表"), shiny::uiOutput(ns("tbl_slot")))
     )

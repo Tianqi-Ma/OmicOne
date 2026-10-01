@@ -30,6 +30,14 @@ mod_wes_driver_ui <- function(id) {
             interaction plot marks significance with dots: the darker the tile,
             the stronger the co-occurrence (green) or exclusivity (brown).",
       zh = "在大队列中提高<b>最小突变数</b>可以降噪。互作图用点标记显著性：格子颜色越深，共现（绿）或互斥（棕）越强。"),
+    read = list(
+      en = "<b>Oncodrive</b>: one bubble per gene — x is the cluster score, size
+            the number of mutated samples, and only genes passing the FDR cutoff
+            are drawn; bubbles far right with low FDR are the credible drivers.
+            <b>Interactions</b>: every tile is a gene pair — green co-occurs more
+            than chance, brown avoids each other, dots mark significance.
+            Exclusive pairs usually share a pathway.",
+      zh = "<b>Oncodrive</b>：每个气泡一个基因——横轴为聚集得分，气泡大小为突变样本数，只有过 FDR 阈值的基因才会显示；越靠右且 FDR 越低越可信。<b>互作</b>：每个格子是一对基因——绿色表示共现多于随机，棕色表示互相回避，圆点标记显著。互斥的基因对通常属于同一通路。"),
     example = list(
       en = "In AML, <code>NPM1</code> and <code>FLT3</code> co-occur, while
                <code>TP53</code> is mutually exclusive with most of the
@@ -55,11 +63,16 @@ mod_wes_driver_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Drivers & interactions", zh = "驱动基因与互作"),
+    subtitle  = list(en = "Statistical driver calls and pairwise gene interactions.",
+                     zh = "统计识别驱动基因，并检验基因两两互作。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Oncodrive", "Oncodrive"),   preview_plot_ui(ns("drv"), download = TRUE)),
+      bslib::nav_panel(i18n("Oncodrive", "Oncodrive"),
+                       preview_plot_ui(ns("drv"), download = TRUE,
+                                       guide = list(en = "Genes whose mutations cluster suspiciously will be drawn here.",
+                                                    zh = "运行后，这里将绘制突变异常聚集的候选驱动基因。"))),
       bslib::nav_panel(i18n("Interactions", "基因互作"), preview_plot_ui(ns("int"), download = TRUE)),
       bslib::nav_panel(i18n("Driver table", "驱动基因表"), shiny::uiOutput(ns("tbl_slot")))
     )

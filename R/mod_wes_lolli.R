@@ -31,6 +31,15 @@ mod_wes_lolli_ui <- function(id) {
             crowded hotspots stay readable, and their size adapts to how many
             positions are annotated.",
       zh = "从下拉框选择基因——已按突变频率排序。<b>蛋白改变列</b>会自动识别；如果图是空的，多半是你的 MAF 用了不常见的列名，可在此手动指定。标签采用斥力排布，热点密集时也不重叠，字号会随标注位点数量自适应。"),
+    read = list(
+      en = "The x-axis is the protein sequence, boxes are annotated domains, and
+            each lollipop is one observed mutation — height counts how many
+            samples share it, colour its consequence. One tall lollipop inside a
+            domain is a hotspot under selection (oncogene-style); mutations
+            scattered along the whole length suggest loss of function
+            (tumour-suppressor-style). Labels rotate vertical automatically when
+            a hotspot gets crowded.",
+      zh = "横轴是蛋白序列，方框为注释结构域，每个棒棒糖代表一个观察到的突变——高度是共享该突变的样本数，颜色是后果。结构域内一根孤立的高棒棒糖是受选择的热点（癌基因风格）；沿全长散布的突变提示功能缺失（抑癌基因风格）。热点拥挤时标签会自动转为竖排。"),
     example = list(
       en = "<code>TP53</code> shows scattered mutations concentrated in the DNA
                binding domain; <code>FLT3</code> shows one dominant hotspot at
@@ -48,10 +57,14 @@ mod_wes_lolli_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Lollipop / domains", zh = "Lollipop / 结构域"),
+    subtitle  = list(en = "Where on the protein the mutations land.",
+                     zh = "突变落在蛋白的哪个位置。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("plot"), download = TRUE)
+    preview   = preview_plot_ui(ns("plot"), download = TRUE,
+                                guide = list(en = "The chosen gene's mutation map over its protein domains will be drawn here.",
+                                             zh = "运行后，这里将绘制所选基因在蛋白结构域上的突变分布图。"))
   )
 }
 

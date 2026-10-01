@@ -94,9 +94,10 @@ body { background: var(--sc-bg); color: var(--sc-text); }
 .omicone-navlabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---- step header ---- */
+.omicone-headwrap { width: 100%; }
 .omicone-stephead { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .omicone-steptitle { font-weight: 700; font-size: 1.06rem; }
-.omicone-subtitle { color: var(--sc-muted); font-size: .82rem; }
+.omicone-subtitle { color: var(--sc-muted); font-size: .82rem; margin-top: .1rem; }
 .omicone-summarystrip { display: inline-flex; gap: .4rem; flex-wrap: wrap; }
 .omicone-pill {
   display: inline-flex; align-items: baseline; gap: .35rem;
@@ -243,6 +244,21 @@ body { background: var(--sc-bg); color: var(--sc-text); }
 .omicone-omicon { font-size: 1.6rem; color: var(--sc-accent2); margin-bottom: .5rem; }
 .omicone-omtitle { font-weight: 700; font-size: 1.05rem; margin-bottom: .3rem; }
 .omicone-omdesc { color: var(--sc-muted); font-size: .85rem; line-height: 1.4; }
+
+/* ---- pre-run preview guide (fills the empty canvas until the plot renders) ---- */
+.omicone-preview-guide {
+  flex: 1 1 auto; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: .45rem; text-align: center;
+  color: var(--sc-muted); padding: 2rem; min-height: 220px;
+}
+.omicone-preview-guide-icon { font-size: 1.6rem; opacity: .6; }
+.omicone-preview-guide-text { max-width: 34rem; font-size: .88rem; line-height: 1.55; }
+.omicone-preview-guide-hint { font-size: .78rem; opacity: .8; }
+/* once the plot output has real content, the guide steps aside */
+.omicone-preview-guide:has(+ .shiny-plot-output:not(:empty)) { display: none; }
+/* an empty plot output shouldn't claim flex space next to the guide */
+.omicone-plotwrap > .shiny-plot-output:empty { flex: 0 0 auto; }
+.omicone-plotwrap > .omicone-fig-dl { flex: 0 0 auto; }
 
 /* ---- figure export row ---- */
 .omicone-fig-dl {

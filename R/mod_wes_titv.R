@@ -31,6 +31,15 @@ mod_wes_titv_ui <- function(id) {
             VAF and rainfall need a <b>VAF column</b>; many MAFs do not have one,
             in which case those two tabs will say so.",
       zh = "关闭<b>包含同义突变</b>可只看编码影响。VAF 和 rainfall 需要一个 <b>VAF 列</b>；很多 MAF 没有该列，这两个页签会给出提示。"),
+    read = list(
+      en = "<b>TiTv</b>: the boxplots spread each sample's six base changes; the
+            bars summarise the cohort. Transitions normally outnumber
+            transversions ~2:1 — a flipped ratio means a mutagen or a QC
+            problem. <b>VAF</b>: one cloud per gene; clonal heterozygous
+            mutations sit near 0.5, subclones trail lower. <b>Rainfall</b>: most
+            variants lie far apart (high on the y-axis); a tight cluster hugging
+            the bottom is a kataegis hotspot.",
+      zh = "<b>TiTv</b>：箱线图展开每个样本的六类碱基替换，柱条汇总整个队列。正常情况下转换约为颠换的 2 倍——比例倒挂提示诱变剂暴露或质控问题。<b>VAF</b>：每个基因一朵云；克隆性杂合突变位于 0.5 附近，亚克隆拖在低处。<b>Rainfall</b>：多数变异彼此相距很远（纵轴高处）；贴底的密集簇即 kataegis 热点。"),
     example = list(
       en = "A C>T dominated spectrum in a skin tumour points at UV damage; in a
                lung tumour a C>A excess points at tobacco.",
@@ -48,11 +57,15 @@ mod_wes_titv_ui <- function(id) {
   )
   step_container(
     title     = list(en = "TiTv / VAF / rainfall", zh = "TiTv / VAF / rainfall"),
+    subtitle  = list(en = "Three spectra: base-change balance, allele fractions, genome-wide spacing.",
+                     zh = "三种图谱：碱基替换平衡、等位基因频率、全基因组间距。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel("TiTv",     preview_plot_ui(ns("titv"), download = TRUE)),
+      bslib::nav_panel("TiTv",     preview_plot_ui(ns("titv"), download = TRUE,
+                                       guide = list(en = "Transition/transversion spectra for every sample will be drawn here.",
+                                                    zh = "运行后，这里将绘制每个样本的转换/颠换图谱。"))),
       bslib::nav_panel("VAF",      preview_plot_ui(ns("vaf"), download = TRUE)),
       bslib::nav_panel(i18n("Rainfall", "Rainfall"), preview_plot_ui(ns("rain"), download = TRUE))
     )

@@ -52,11 +52,29 @@ sc_palette <- function(n = 8, type = "discrete") {
 #' [register_figure_download()], wired with the same local `id`.
 #' @param id Namespaced output id. @param height CSS height.
 #' @param download Add the figure-export row under the plot.
+#' @param guide Optional bilingual `list(en =, zh =)` describing what the plot
+#'   will show. Rendered as a centred placeholder inside the empty preview area
+#'   before the first run, and hidden automatically (pure CSS) once the plot
+#'   output has content.
 #' @keywords internal
-preview_plot_ui <- function(id, height = "100%", download = FALSE) {
+preview_plot_ui <- function(id, height = "100%", download = FALSE,
+                            guide = NULL) {
+  g <- NULL
+  if (!is.null(guide)) {
+    g <- shiny::div(
+      class = "omicone-preview-guide",
+      shiny::div(class = "omicone-preview-guide-icon", "\U0001F4CA"),
+      shiny::div(class = "omicone-preview-guide-text",
+                 if (is.list(guide)) i18n(guide$en, guide$zh) else guide),
+      shiny::div(class = "omicone-preview-guide-hint",
+                 i18n("Set the options on the left, then click the Run button.",
+                      "在左侧设置选项，然后点击运行按钮。"))
+    )
+  }
   out <- shiny::plotOutput(id, height = height)
-  if (!isTRUE(download)) return(out)
+  if (!isTRUE(download)) return(shiny::tagList(g, out))
   shiny::tagList(
+    g,
     out,
     shiny::div(
       class = "omicone-fig-dl",

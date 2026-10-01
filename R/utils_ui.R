@@ -31,12 +31,13 @@ i18n <- function(en, zh, tag = shiny::tags$span) {
 #' accepts a bilingual pair.
 #'
 #' @param title Bilingual list(en=, zh=) or single string: short step title.
-#' @param what,why,how,example Bilingual list(en=, zh=) pairs (how/example
-#'   optional). `example` is highlighted.
+#' @param what,why,how,read,example Bilingual list(en=, zh=) pairs (how/read/
+#'   example optional). `read` explains how to interpret the resulting figure
+#'   or table; `example` is highlighted.
 #' @param open Logical; start expanded. Default `FALSE` (plot-first).
 #' @keywords internal
-explainer_card <- function(title, what, why, how = NULL, example = NULL,
-                           open = FALSE) {
+explainer_card <- function(title, what, why, how = NULL, read = NULL,
+                           example = NULL, open = FALSE) {
   bi <- function(x, prefix_en, prefix_zh) {
     if (is.null(x)) return(NULL)
     if (is.list(x)) {
@@ -51,6 +52,7 @@ explainer_card <- function(title, what, why, how = NULL, example = NULL,
     bi(what, "What", "作用"),
     bi(why,  "Why",  "为什么"),
     bi(how,  "How",  "怎么用"),
+    bi(read, "How to read the result", "如何解读结果"),
     if (!is.null(example)) {
       ex <- if (is.list(example)) example else list(en = example, zh = example)
       shiny::div(class = "omicone-example",
@@ -89,6 +91,8 @@ label_with_help <- function(label_en, tip_en, label_zh = label_en, tip_zh = tip_
 #' Plot-first step container: narrow control rail + large preview
 #'
 #' @param title Bilingual list(en=, zh=) or string: the step title (header).
+#' @param subtitle Bilingual list(en=, zh=) or string: one always-visible line
+#'   under the title saying what this step does. Optional.
 #' @param explainer An [explainer_card()] (collapsed). Rendered as a full-width
 #'   strip between the header and the workspace, so long prose is never
 #'   squeezed into the narrow control rail.
@@ -98,14 +102,22 @@ label_with_help <- function(label_en, tip_en, label_zh = label_en, tip_zh = tip_
 #' @param rail_width Control-rail width. Default "280px".
 #' @keywords internal
 step_container <- function(title, explainer, controls, summary, preview,
-                           rail_width = "280px") {
+                           rail_width = "280px", subtitle = NULL) {
   ttl <- if (is.list(title)) i18n(title$en, title$zh) else title
+  sub <- NULL
+  if (!is.null(subtitle)) {
+    sub <- shiny::div(class = "omicone-subtitle",
+                      if (is.list(subtitle)) i18n(subtitle$en, subtitle$zh)
+                      else subtitle)
+  }
   bslib::card(
     class = "omicone-step", full_screen = TRUE,
     bslib::card_header(
-      shiny::div(class = "omicone-stephead",
-                 shiny::span(class = "omicone-steptitle", ttl),
-                 shiny::div(class = "omicone-summarystrip", summary))
+      shiny::div(class = "omicone-headwrap",
+                 shiny::div(class = "omicone-stephead",
+                            shiny::span(class = "omicone-steptitle", ttl),
+                            shiny::div(class = "omicone-summarystrip", summary)),
+                 sub)
     ),
     if (!is.null(explainer)) explainer,
     bslib::layout_sidebar(

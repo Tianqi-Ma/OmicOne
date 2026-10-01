@@ -30,6 +30,14 @@ mod_wes_import_ui <- function(id) {
             own data, a MAF from Mutect2/Strelka/VarScan via <code>vcf2maf</code>
             or the GDC works as-is.",
       zh = "<b>只是想体验？</b>选择<b>演示数据</b>——maftools 自带一份 TCGA LAML 队列（193 个样本），可离线即时加载。用自己的数据时，Mutect2/Strelka/VarScan 经 <code>vcf2maf</code> 转换的 MAF、或 GDC 下载的 MAF 都可直接使用。"),
+    read = list(
+      en = "The <b>Per-sample</b> tab lists one row per tumour: total variants
+            plus a breakdown by consequence — a sample with ten times the median
+            is usually a calling artefact. <b>Per-gene</b> flips it around: one
+            row per gene, with how many samples and variants hit it.
+            <b>Clinical</b> shows the attached table as loaded; check the row
+            count there matches the number of samples.",
+      zh = "<b>各样本</b>页签每行一个肿瘤样本：变异总数及按后果的分类统计——若某样本是中位数的十倍，多半是检出假阳性。<b>各基因</b>页签则反过来：每行一个基因，列出命中它的样本数与变异数。<b>临床数据</b>页签原样展示载入的临床表；请核对其行数是否等于样本数。"),
     example = list(
       en = "The clinical table needs a <code>Tumor_Sample_Barcode</code> column
                matching the MAF, plus whatever else you have
@@ -64,6 +72,8 @@ mod_wes_import_ui <- function(id) {
 
   step_container(
     title     = list(en = "Import MAF", zh = "导入 MAF"),
+    subtitle  = list(en = "Load the mutation file every later step reads from.",
+                     zh = "载入突变数据——之后的每一步都从这里读取。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),

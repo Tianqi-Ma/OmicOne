@@ -31,6 +31,14 @@ mod_wes_hetero_ui <- function(id) {
             cannot run. Copy-number-altered regions distort VAF, so treat the
             clusters as descriptive.",
       zh = "该步骤需要 MAF 中有 <b>VAF 列</b>；如果下拉框里没有可选项，说明你的变异检出工具未报告等位基因频率，本分析无法进行。拷贝数改变区域会扭曲 VAF，因此这些聚类结果只作描述性参考。"),
+    read = list(
+      en = "Each point is one mutation of the chosen sample, placed by its VAF;
+            the density curve along the top shows where they pile up. A single
+            tall peak near 0.5 is a clean, clonal sample; several lower peaks
+            are subclones. The MATH score compresses this into one number —
+            roughly, above 30 reads as heterogeneous, below 20 close to clonal.
+            Copy-number changes bend VAF, so read the peaks descriptively.",
+      zh = "每个点是所选样本的一个突变，按其 VAF 定位；上方的密度曲线显示它们在哪里堆积。0.5 附近单一高峰代表干净的克隆性样本；若干个较低的峰则是亚克隆。MATH 分数把它压缩成一个数字——大致上高于 30 为高异质性，低于 20 接近单克隆。拷贝数改变会使 VAF 偏移，因此这些峰只作描述性解读。"),
     example = list(
       en = "A MATH score above roughly 30 is commonly treated as a heterogeneous
                tumour; below ~20 the tumour is close to clonal.",
@@ -43,11 +51,16 @@ mod_wes_hetero_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Heterogeneity", zh = "肿瘤异质性"),
+    subtitle  = list(en = "Clonal structure from allele fractions (MATH score).",
+                     zh = "从等位基因频率推断克隆结构（MATH 分数）。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Clusters", "克隆聚类"), preview_plot_ui(ns("plot"), download = TRUE)),
+      bslib::nav_panel(i18n("Clusters", "克隆聚类"),
+                       preview_plot_ui(ns("plot"), download = TRUE,
+                                       guide = list(en = "The chosen sample's VAF clusters will be drawn here.",
+                                                    zh = "运行后，这里将绘制所选样本的 VAF 聚类图。"))),
       bslib::nav_panel(i18n("Variants", "变异明细"), shiny::uiOutput(ns("tbl_slot")))
     )
   )

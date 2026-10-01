@@ -28,6 +28,15 @@ mod_wes_summary_ui <- function(id) {
             the boxplot. Turn the <b>dashboard</b> off for a plain stacked
             barplot of variant classifications only.",
       zh = "<b>剔除离群值</b>可避免某个超突变样本把箱线图压平。关闭<b>仪表盘</b>则只显示变异分类的堆叠柱状图。"),
+    read = list(
+      en = "Six panels. Top row: which consequences (<i>Missense</i>,
+            <i>Nonsense</i>…), variant types (SNP/INS/DEL) and base changes
+            dominate — a C>T majority is the normal ageing background, C>A
+            points at tobacco. Bottom row: variants per sample (the dashed line
+            is your chosen statistic), the burden as a boxplot, and the top
+            genes with the share of samples hit. A clean cohort has most samples
+            near the median and no single gene mutated in more than ~30%.",
+      zh = "共六个面板。上排：主要的突变后果（<i>错义</i>、<i>无义</i>……）、变异类型（SNP/INS/DEL）与碱基替换——C>T 为主是正常的衰老背景，C>A 提示烟草暴露。下排：每样本变异数（虚线为你选择的统计量）、负荷箱线图、以及高频基因及其样本占比。干净的队列里多数样本应接近中位数，且没有单个基因在超过约 30% 的样本中突变。"),
     example = list(
       en = "In TCGA LAML most samples carry only a handful of variants and
                <code>FLT3</code>, <code>DNMT3A</code>, <code>NPM1</code> top the
@@ -52,11 +61,16 @@ mod_wes_summary_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Cohort summary", zh = "队列概览"),
+    subtitle  = list(en = "The cohort at a glance: mutation types, per-sample burden, top genes.",
+                     zh = "队列全景一瞥：突变类型、每样本负荷、高频基因。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Dashboard", "仪表盘"), preview_plot_ui(ns("plot"), download = TRUE)),
+      bslib::nav_panel(i18n("Dashboard", "仪表盘"),
+                       preview_plot_ui(ns("plot"), download = TRUE,
+                                       guide = list(en = "A six-panel dashboard of the cohort's mutation landscape will be drawn here.",
+                                                    zh = "运行后，这里将绘制队列突变全景的六联仪表盘。"))),
       bslib::nav_panel(i18n("Gene frequencies", "基因频率"), shiny::uiOutput(ns("tbl_slot")))
     )
   )
