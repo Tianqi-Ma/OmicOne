@@ -56,7 +56,7 @@ mod_wes_summary_ui <- function(id) {
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Dashboard", "仪表盘"), preview_plot_ui(ns("plot"))),
+      bslib::nav_panel(i18n("Dashboard", "仪表盘"), preview_plot_ui(ns("plot"), download = TRUE)),
       bslib::nav_panel(i18n("Gene frequencies", "基因频率"), shiny::uiOutput(ns("tbl_slot")))
     )
   )
@@ -101,13 +101,20 @@ mod_wes_summary_server <- function(id, rv, log_rv) {
       )
     })
 
-    output$plot <- render_base_plot(function() {
+    draw_summary <- function() {
       o <- opts(); shiny::req(rv$maf, o)
+      n_samples <- tryCatch(nrow(maftools::getSampleSummary(rv$maf)),
+                            error = function(e) NA_integer_)
       maftools::plotmafSummary(maf = rv$maf, rmOutlier = o$rm_outlier,
                                addStat = if (identical(o$stat, "none")) NULL else o$stat,
                                dashboard = o$dashboard, titvRaw = FALSE,
-                               top = o$top)
-    })
+                               top = o$top,
+                               fs = adaptive_cex(n_samples, n_ref = 60,
+                                                 lo = 0.75, hi = 1.05))
+    }
+    output$plot <- render_base_plot(draw_summary)
+    register_figure_download(output, input, "plot", draw_summary,
+                             "wes_cohort_summary", width = 12, height = 9)
 
     output$tbl_slot <- shiny::renderUI({
       if (is.null(rv$maf)) return(wes_no_maf())

@@ -59,8 +59,8 @@ mod_wes_driver_ui <- function(id) {
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Oncodrive", "Oncodrive"),   preview_plot_ui(ns("drv"))),
-      bslib::nav_panel(i18n("Interactions", "基因互作"), preview_plot_ui(ns("int"))),
+      bslib::nav_panel(i18n("Oncodrive", "Oncodrive"),   preview_plot_ui(ns("drv"), download = TRUE)),
+      bslib::nav_panel(i18n("Interactions", "基因互作"), preview_plot_ui(ns("int"), download = TRUE)),
       bslib::nav_panel(i18n("Driver table", "驱动基因表"), shiny::uiOutput(ns("tbl_slot")))
     )
   )
@@ -125,16 +125,30 @@ mod_wes_driver_server <- function(id, rv, log_rv) {
       )
     })
 
-    output$drv <- render_base_plot(function() {
+    draw_drv <- function() {
       shiny::req(res$drv)
+      n_sig <- tryCatch(sum(as.data.frame(res$drv)$fdr <= res$fdr, na.rm = TRUE),
+                        error = function(e) 10)
       maftools::plotOncodrive(res = res$drv, fdrCutOff = res$fdr, useFraction = TRUE,
-                              labelSize = 0.6)
-    })
+                              labelSize = adaptive_cex(max(1, n_sig), base = 0.7,
+                                                       n_ref = 12, lo = 0.4, hi = 0.8))
+    }
+    output$drv <- render_base_plot(draw_drv)
+    register_figure_download(output, input, "drv", draw_drv, "wes_oncodrive",
+                             width = 10, height = 6)
 
-    output$int <- render_base_plot(function() {
+    draw_int <- function() {
       shiny::req(rv$maf, res$drv)   # gate on the run having happened
-      wes_interactions(rv$maf, top = res$top)
-    })
+      maftools::somaticInteractions(maf = rv$maf, top = res$top,
+                                    pvalue = c(0.05, 0.1),
+                                    fontSize = adaptive_cex(res$top, n_ref = 25,
+                                                            lo = 0.6, hi = 1.1),
+                                    countsFontSize = 0.8)
+    }
+    output$int <- render_base_plot(draw_int)
+    register_figure_download(output, input, "int", draw_int, "wes_interactions",
+                             width = function() max(8, min(14, 2 + 0.3 * res$top)),
+                             height = 8)
 
     output$tbl_slot <- shiny::renderUI({
       if (is.null(res$drv)) return(wes_no_maf())

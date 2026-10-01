@@ -292,7 +292,15 @@ wes_trinuc <- function(maf, build = "hg19") {
 #' @return list(sig=, cmp=) — the extracted signatures and the COSMIC comparison.
 #' @keywords internal
 wes_signatures <- function(tnm, n = 3) {
-  sig <- maftools::extractSignatures(mat = tnm, n = n, pConstant = 0.1)
+  # NMF (0.28, current CRAN) resolves its internal `seed` S4 generic with a
+  # bare getGeneric("seed"), which returns NULL once the Bioconductor stack —
+  # attached by trinucleotideMatrix's BSgenome load — is on the search path
+  # while NMF itself is not. Attaching NMF restores the lookup.
+  if (!"package:NMF" %in% search()) suppressMessages(attachNamespace("NMF"))
+  # parallel = NULL: NMF's parallel mode (.opt = "P4") dies inside Shiny where
+  # no foreach backend is registered; sequential NMF is seconds on this matrix.
+  sig <- maftools::extractSignatures(mat = tnm, n = n, pConstant = 0.1,
+                                     parallel = NULL)
   cmp <- tryCatch(maftools::compareSignatures(nmfRes = sig, sig_db = "SBS"),
                   error = function(e) NULL)
   list(sig = sig, cmp = cmp)

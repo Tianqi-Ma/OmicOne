@@ -63,7 +63,7 @@ mod_wes_onco_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("plot"))
+    preview   = preview_plot_ui(ns("plot"), download = TRUE)
   )
 }
 
@@ -150,10 +150,13 @@ mod_wes_onco_server <- function(id, rv, log_rv) {
       )
     })
 
-    output$plot <- render_base_plot(function() {
+    draw_onco <- function() {
       c0 <- cfg(); shiny::req(rv$maf, c0)
+      n_genes <- if (is.null(c0$genes)) c0$top else length(c0$genes)
       args <- list(maf = rv$maf, draw_titv = c0$titv, showTumorSampleBarcodes = FALSE,
-                   removeNonMutated = TRUE)
+                   removeNonMutated = TRUE,
+                   fontSize = adaptive_cex(n_genes, base = 0.9, n_ref = 20,
+                                           lo = 0.45, hi = 1))
       if (is.null(c0$genes)) args$top <- c0$top else args$genes <- c0$genes
       if (length(c0$clin)) {
         args$clinicalFeatures <- c0$clin
@@ -161,6 +164,18 @@ mod_wes_onco_server <- function(id, rv, log_rv) {
       }
       if (!c0$pct) args$showPct <- FALSE
       do.call(maftools::oncoplot, args)
-    })
+    }
+    output$plot <- render_base_plot(draw_onco)
+    register_figure_download(
+      output, input, "plot", draw_onco, "wes_oncoplot",
+      width = function() {
+        n <- tryCatch(nrow(maftools::getSampleSummary(rv$maf)), error = function(e) 50)
+        max(10, min(30, 4 + 0.09 * n))
+      },
+      height = function() {
+        c0 <- cfg()
+        n <- if (is.null(c0)) 20 else if (is.null(c0$genes)) c0$top else length(c0$genes)
+        max(7, min(20, 3 + 0.28 * n))
+      })
   })
 }

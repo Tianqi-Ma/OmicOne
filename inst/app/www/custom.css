@@ -212,3 +212,16 @@ body { background: var(--sc-bg); color: var(--sc-text); }
 .omicone-omicon { font-size: 1.6rem; color: var(--sc-accent2); margin-bottom: .5rem; }
 .omicone-omtitle { font-weight: 700; font-size: 1.05rem; margin-bottom: .3rem; }
 .omicone-omdesc { color: var(--sc-muted); font-size: .85rem; line-height: 1.4; }
+
+/* ---- figure export row ---- */
+.omicone-fig-dl {
+  display: flex; align-items: center; justify-content: flex-end; gap: .5rem;
+  margin-top: .35rem; padding-top: .35rem; border-top: 1px dashed var(--sc-border);
+}
+.omicone-fig-dl .form-group { margin-bottom: 0; }
+.omicone-fig-dl .shiny-input-container { width: auto; }
+.omicone-fig-dl label {
+  font-size: .72rem; color: var(--sc-muted); margin-bottom: .1rem; font-weight: 500;
+}
+.omicone-fig-dl .btn { line-height: 1.2; white-space: nowrap; }
+.omicone-fig-dl .form-control { padding: .2rem .4rem; font-size: .82rem; height: auto; }

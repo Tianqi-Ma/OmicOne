@@ -27,8 +27,10 @@ mod_wes_tmb_ui <- function(id) {
     how  = list(
       en = "Set <b>capture size</b> to your kit's actual target size in Mb — the
             default 50 Mb is the usual whole-exome figure. Getting this wrong
-            scales every value, so check your kit's documentation.",
-      zh = "把<b>捕获区域大小</b>设为你所用试剂盒的实际目标区域（Mb）——默认 50 Mb 是全外显子常见值。设错会让所有数值等比例偏移，请查阅试剂盒文档。"),
+            scales every value, so check your kit's documentation. The
+            <b>vs TCGA</b> tab puts your cohort's median next to all 33 TCGA
+            cohorts, so you can tell a genuinely high burden from an ordinary one.",
+      zh = "把<b>捕获区域大小</b>设为你所用试剂盒的实际目标区域（Mb）——默认 50 Mb 是全外显子常见值。设错会让所有数值等比例偏移，请查阅试剂盒文档。<b>vs TCGA</b> 页签把本队列的中位 TMB 与全部 33 个 TCGA 队列并列展示，可以据此判断突变负荷是真的偏高还是普通水平。"),
     example = list(
       en = "Agilent SureSelect V6 covers ~60 Mb; IDT xGen Exome ~39 Mb; a
                targeted 500-gene panel might be ~1.5 Mb.",
@@ -49,7 +51,8 @@ mod_wes_tmb_ui <- function(id) {
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Distribution", "分布图"), preview_plot_ui(ns("plot"))),
+      bslib::nav_panel(i18n("Distribution", "分布图"), preview_plot_ui(ns("plot"), download = TRUE)),
+      bslib::nav_panel(i18n("vs TCGA", "对比 TCGA"),  preview_plot_ui(ns("tcga"), download = TRUE)),
       bslib::nav_panel(i18n("Per sample", "各样本"),   shiny::uiOutput(ns("tbl_slot")))
     )
   )
@@ -65,8 +68,8 @@ mod_wes_tmb_server <- function(id, rv, log_rv) {
     shiny::observeEvent(input$run, {
       shiny::req(rv$maf)
       if (!require_pkgs("maftools", "TMB")) return(NULL)
-      cap <- suppressWarnings(as.numeric(input$capture))
-      if (is.na(cap) || cap <= 0) {
+      cap <- suppressWarnings(as.numeric(input$capture %||% NA_real_))
+      if (length(cap) != 1 || is.na(cap) || cap <= 0) {
         shiny::showNotification("Capture size must be a positive number of megabases.",
                                 type = "error", duration = 10)
         return(NULL)
@@ -111,10 +114,29 @@ mod_wes_tmb_server <- function(id, rv, log_rv) {
       )
     })
 
-    output$plot <- render_base_plot(function() {
+    draw_tmb <- function() {
       shiny::req(rv$maf, res$df)
       maftools::tmb(maf = rv$maf, captureSize = res$capture, logScale = res$log)
-    })
+    }
+    output$plot <- render_base_plot(draw_tmb)
+    register_figure_download(output, input, "plot", draw_tmb, "wes_tmb",
+                             width = 10, height = 7)
+
+    draw_tcga <- function() {
+      shiny::req(rv$maf, res$df)
+      lab <- rv$maf_source %||% "This cohort"
+      lab <- sub("\\.(maf|maf\\.gz|txt|tsv|csv)$", "", basename(lab),
+                 ignore.case = TRUE)
+      lab <- trimws(gsub("[()]", "", sub("(?i)\\bdemo\\b\\s*:?", "", lab,
+                                         perl = TRUE)))
+      if (!nzchar(lab)) lab <- "This cohort"
+      if (nchar(lab) > 18) lab <- paste0(substr(lab, 1, 17), "~")
+      maftools::tcgaCompare(maf = rv$maf, cohortName = lab,
+                            capture_size = res$capture, logscale = res$log)
+    }
+    output$tcga <- render_base_plot(draw_tcga)
+    register_figure_download(output, input, "tcga", draw_tcga,
+                             "wes_tmb_vs_tcga", width = 12, height = 8)
 
     output$tbl_slot <- shiny::renderUI({
       if (is.null(res$df)) return(wes_no_maf())

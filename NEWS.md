@@ -1,3 +1,40 @@
+# OmicOne 0.6.1 (unreleased)
+
+## Added
+- **Figure export on every WES plot**: each preview now carries a download row
+  with a format selector (PNG / JPEG / vector PDF) and, for raster formats, a
+  DPI field (72–1200). The export replays the exact draw closure used on
+  screen, so the file matches the preview — for maftools' base-graphics plots
+  and the ggplot Kaplan-Meier curve alike.
+- **TMB vs TCGA**: the Tumour mutational burden step gains a tab that plots the
+  cohort's median TMB against all 33 TCGA cohorts
+  (`maftools::tcgaCompare()`), labelled with the imported cohort's name.
+
+## Changed
+- **Adaptive plot fonts**: text now scales with how much is drawn — oncoplot
+  gene labels with the number of genes, the cohort summary with sample count,
+  interaction and oncodrive plots with genes tested. The lollipop plot repels
+  labels (berryFunctions) and rotates them vertical when the labelled
+  positions are densely packed, so hotspots like TP53 stay readable.
+
+## Fixed
+- **Mutational signatures run end-to-end** (BSgenome.Hsapiens.UCSC.hg19 + NMF).
+  Two environment pitfalls are worked around in `wes_signatures()`: NMF 0.28's
+  internal `getGeneric("seed")` returns NULL once the Bioconductor stack is
+  attached (NMF is now attached explicitly), and NMF's parallel mode expects a
+  foreach backend Shiny never registers (extraction now runs sequentially).
+- **TMB**: a blank or non-numeric capture size shows a clear message instead
+  of an error.
+- The APOBEC tab now explains when a cohort simply has no APOBEC enrichment
+  instead of showing maftools' raw error.
+
+## Validation
+- Full WES pipeline re-validated against maftools 2.26.0 (Bioc 3.22, R 4.5):
+  24/24 wrapper checks, 12/12 modules via `shiny::testServer` (now including
+  signatures), 15/15 figure downloads byte-verified across PNG/JPEG/PDF.
+
+---
+
 # OmicOne 0.6.0
 
 Renamed from **OMICstudio** to **OmicOne**.

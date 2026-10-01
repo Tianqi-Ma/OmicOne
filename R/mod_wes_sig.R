@@ -58,9 +58,9 @@ mod_wes_sig_ui <- function(id) {
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Signatures", "特征谱"), preview_plot_ui(ns("sig"))),
+      bslib::nav_panel(i18n("Signatures", "特征谱"), preview_plot_ui(ns("sig"), download = TRUE)),
       bslib::nav_panel(i18n("COSMIC match", "COSMIC 匹配"), shiny::uiOutput(ns("tbl_slot"))),
-      bslib::nav_panel(i18n("APOBEC enrichment", "APOBEC 富集"), preview_plot_ui(ns("apo")))
+      bslib::nav_panel(i18n("APOBEC enrichment", "APOBEC 富集"), preview_plot_ui(ns("apo"), download = TRUE))
     )
   )
 }
@@ -115,16 +115,29 @@ mod_wes_sig_server <- function(id, rv, log_rv) {
       )
     })
 
-    output$sig <- render_base_plot(function() {
+    draw_sig <- function() {
       shiny::req(res$sig)
       maftools::plotSignatures(nmfRes = res$sig, title_size = 1.0,
                                sig_db = "SBS")
-    })
+    }
+    output$sig <- render_base_plot(draw_sig)
+    register_figure_download(output, input, "sig", draw_sig, "wes_signatures",
+                             width = 11, height = function() max(4, 2 + 1.6 * res$n))
 
-    output$apo <- render_base_plot(function() {
+    draw_apo <- function() {
       shiny::req(res$tnm)
-      maftools::plotApobecDiff(tnm = res$tnm, maf = rv$maf)
-    })
+      msg <- tryCatch({ maftools::plotApobecDiff(tnm = res$tnm, maf = rv$maf); NULL },
+                      error = function(e) conditionMessage(e))
+      if (!is.null(msg)) {
+        if (grepl("differentially mutated genes", msg, ignore.case = TRUE)) {
+          stop("No APOBEC enrichment found in this cohort — that mutational process is essentially absent here (expected for many tumour types, e.g. leukaemia).")
+        }
+        stop(msg)
+      }
+    }
+    output$apo <- render_base_plot(draw_apo)
+    register_figure_download(output, input, "apo", draw_apo, "wes_apobec",
+                             width = 10, height = 7)
 
     output$tbl_slot <- shiny::renderUI({
       if (is.null(res$cmp)) return(wes_no_maf())

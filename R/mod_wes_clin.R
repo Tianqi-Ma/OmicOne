@@ -49,9 +49,9 @@ mod_wes_clin_ui <- function(id) {
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Clinical enrichment", "临床富集"), preview_plot_ui(ns("enr"))),
-      bslib::nav_panel(i18n("Pathways", "通路"),   preview_plot_ui(ns("path"))),
-      bslib::nav_panel(i18n("Drugs", "药物"),      preview_plot_ui(ns("drug"))),
+      bslib::nav_panel(i18n("Clinical enrichment", "临床富集"), preview_plot_ui(ns("enr"), download = TRUE)),
+      bslib::nav_panel(i18n("Pathways", "通路"),   preview_plot_ui(ns("path"), download = TRUE)),
+      bslib::nav_panel(i18n("Drugs", "药物"),      preview_plot_ui(ns("drug"), download = TRUE)),
       bslib::nav_panel(i18n("Enrichment table", "富集结果表"), shiny::uiOutput(ns("tbl_slot")))
     )
   )
@@ -120,23 +120,32 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
       )
     })
 
-    output$enr <- render_base_plot(function() {
+    draw_enr <- function() {
       shiny::req(res$ran)
       if (is.null(res$enr)) {
         stop("No clinical feature selected. Attach a clinical table on the Import step to use this tab.")
       }
       maftools::plotEnrichmentResults(enrich_res = res$enr, pVal = res$pval)
-    })
+    }
+    output$enr <- render_base_plot(draw_enr)
+    register_figure_download(output, input, "enr", draw_enr, "wes_enrichment",
+                             width = 10, height = 7)
 
-    output$path <- render_base_plot(function() {
+    draw_path <- function() {
       shiny::req(rv$maf, res$ran)
       wes_pathways(rv$maf)
-    })
+    }
+    output$path <- render_base_plot(draw_path)
+    register_figure_download(output, input, "path", draw_path, "wes_pathways",
+                             width = 10, height = 7)
 
-    output$drug <- render_base_plot(function() {
+    draw_drug <- function() {
       shiny::req(rv$maf, res$ran)
       maftools::drugInteractions(maf = rv$maf, fontSize = 0.75)
-    })
+    }
+    output$drug <- render_base_plot(draw_drug)
+    register_figure_download(output, input, "drug", draw_drug, "wes_drugs",
+                             width = 10, height = 8)
 
     output$tbl_slot <- shiny::renderUI({
       if (is.null(res$enr)) return(wes_no_maf())

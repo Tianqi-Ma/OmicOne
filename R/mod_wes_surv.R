@@ -51,7 +51,7 @@ mod_wes_surv_ui <- function(id) {
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Kaplan-Meier", "生存曲线"), preview_plot_ui(ns("km"))),
+      bslib::nav_panel(i18n("Kaplan-Meier", "生存曲线"), preview_plot_ui(ns("km"), download = TRUE)),
       bslib::nav_panel(i18n("Cohort", "队列表"), shiny::uiOutput(ns("tbl_slot")))
     )
   )
@@ -232,11 +232,14 @@ mod_wes_surv_server <- function(id, rv, log_rv) {
       )
     })
 
-    output$km <- render_scop_plot(function() {
+    km_gg <- function() {
       shiny::req(res$fit)
       km_plot(res$fit, res$lr,
               title = paste0("Overall survival — ", res$label %||% "mutation status"))
-    })
+    }
+    output$km <- render_scop_plot(km_gg)
+    register_figure_download(output, input, "km", function() print(km_gg()),
+                             "wes_kaplan_meier", width = 8, height = 6)
 
     output$tbl_slot <- shiny::renderUI({
       if (is.null(res$df)) return(wes_no_maf())

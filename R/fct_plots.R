@@ -45,10 +45,100 @@ sc_palette <- function(n = 8, type = "discrete") {
 }
 
 #' UI slot for a (large) preview plot. scop plots are static high-res images.
+#'
+#' With `download = TRUE` a compact export row is added under the plot: a
+#' download button, a format selector (PNG / JPEG / PDF) and — for raster
+#' formats — a DPI field. The companion server side is
+#' [register_figure_download()], wired with the same local `id`.
 #' @param id Namespaced output id. @param height CSS height.
+#' @param download Add the figure-export row under the plot.
 #' @keywords internal
-preview_plot_ui <- function(id, height = "100%") {
-  shiny::plotOutput(id, height = height)
+preview_plot_ui <- function(id, height = "100%", download = FALSE) {
+  out <- shiny::plotOutput(id, height = height)
+  if (!isTRUE(download)) return(out)
+  shiny::tagList(
+    out,
+    shiny::div(
+      class = "omicone-fig-dl",
+      shiny::downloadButton(paste0(id, "_dl"), i18n("Download figure", "下载图片"),
+                            class = "btn-sm"),
+      shiny::selectInput(paste0(id, "_dlfmt"), NULL,
+                         c("PNG" = "png", "JPEG" = "jpg", "PDF (vector)" = "pdf"),
+                         selectize = FALSE, width = "120px"),
+      shiny::conditionalPanel(
+        sprintf("input['%s'] != 'pdf'", paste0(id, "_dlfmt")),
+        shiny::numericInput(paste0(id, "_dpi"), "DPI", value = 300,
+                            min = 72, max = 1200, step = 50, width = "96px"))
+    )
+  )
+}
+
+#' Register a figure download handler for a preview plot
+#'
+#' The server half of `preview_plot_ui(..., download = TRUE)`. Replays
+#' `draw_fn()` — the same closure the on-screen renderer uses — into a
+#' png/jpeg/pdf device, so the exported file matches what is on screen.
+#'
+#' @param output,input Module server `output` / `input`.
+#' @param id Local (un-namespaced) output id of the plot.
+#' @param draw_fn Zero-argument function that draws the figure as a side
+#'   effect (for ggplot outputs: `function() print(gg)`).
+#' @param name File stem for the download.
+#' @param width,height Device size in inches; may be a zero-arg function for
+#'   plots whose ideal size depends on the data (e.g. an oncoplot).
+#' @keywords internal
+register_figure_download <- function(output, input, id, draw_fn, name,
+                                     width = 10, height = 7) {
+  dl  <- paste0(id, "_dl")
+  fmt <- paste0(id, "_dlfmt")
+  dpi <- paste0(id, "_dpi")
+  output[[dl]] <- shiny::downloadHandler(
+    filename = function() {
+      f <- input[[fmt]] %||% "png"
+      sprintf("%s_%s.%s", name, format(Sys.time(), "%Y%m%d_%H%M%S"), f)
+    },
+    content = function(file) {
+      f <- input[[fmt]] %||% "png"
+      d <- suppressWarnings(as.numeric(input[[dpi]] %||% 300))
+      if (length(d) != 1 || !is.finite(d)) d <- 300
+      d <- max(36, min(2400, d))
+      w <- if (is.function(width)) width() else width
+      h <- if (is.function(height)) height() else height
+      if (identical(f, "pdf")) {
+        grDevices::pdf(file, width = w, height = h, useDingbats = FALSE)
+      } else if (identical(f, "jpg")) {
+        grDevices::jpeg(file, width = w, height = h, units = "in",
+                        res = d, quality = 95)
+      } else {
+        grDevices::png(file, width = w, height = h, units = "in", res = d)
+      }
+      on.exit(grDevices::dev.off(), add = TRUE)
+      msg <- tryCatch({ draw_fn(); NULL },
+                      shiny.silent.error = function(e)
+                        "Nothing to export yet — run this step first.",
+                      error = function(e) conditionMessage(e))
+      if (!is.null(msg)) {
+        p <- graphics::par(mar = c(0, 0, 0, 0)); on.exit(graphics::par(p), add = TRUE)
+        graphics::plot.new()
+        graphics::text(0.5, 0.5, paste0("Plot error:\n", msg), col = "#c1476b")
+      }
+    }
+  )
+}
+
+#' Gentle text scaling: shrink as the number of labels grows
+#'
+#' `sqrt` falloff clamped to `[lo, hi]`: a handful of labels gets slightly
+#' larger text, a crowded plot slightly smaller, without extremes. Used to
+#' size maftools fonts from the number of genes / samples / labels shown.
+#' @param n Number of labels on the plot.
+#' @param base Size returned when `n == n_ref`. @param n_ref Reference count.
+#' @param lo,hi Clamp bounds.
+#' @keywords internal
+adaptive_cex <- function(n, base = 1, n_ref = 20, lo = 0.55, hi = 1.25) {
+  n <- suppressWarnings(as.numeric(n %||% NA))
+  if (length(n) != 1 || !is.finite(n) || n <= 0) return(base)
+  max(lo, min(hi, base * sqrt(n_ref / n)))
 }
 
 #' Render a scop/ggplot/ComplexHeatmap object to a Shiny plot output

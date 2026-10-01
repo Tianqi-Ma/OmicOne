@@ -27,8 +27,10 @@ mod_wes_lolli_ui <- function(id) {
       en = "Pick a gene from the dropdown — it is sorted by mutation frequency.
             The <b>protein change column</b> is auto-detected; if the plot comes
             back empty, your MAF probably names it something unusual and you can
-            point at the right column here.",
-      zh = "从下拉框选择基因——已按突变频率排序。<b>蛋白改变列</b>会自动识别；如果图是空的，多半是你的 MAF 用了不常见的列名，可在此手动指定。"),
+            point at the right column here. Labels are drawn with repulsion so
+            crowded hotspots stay readable, and their size adapts to how many
+            positions are annotated.",
+      zh = "从下拉框选择基因——已按突变频率排序。<b>蛋白改变列</b>会自动识别；如果图是空的，多半是你的 MAF 用了不常见的列名，可在此手动指定。标签采用斥力排布，热点密集时也不重叠，字号会随标注位点数量自适应。"),
     example = list(
       en = "<code>TP53</code> shows scattered mutations concentrated in the DNA
                binding domain; <code>FLT3</code> shows one dominant hotspot at
@@ -49,7 +51,7 @@ mod_wes_lolli_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("plot"))
+    preview   = preview_plot_ui(ns("plot"), download = TRUE)
   )
 }
 
@@ -125,12 +127,46 @@ mod_wes_lolli_server <- function(id, rv, log_rv) {
       )
     })
 
-    output$plot <- render_base_plot(function() {
+    draw_lolli <- function() {
       c0 <- cfg(); shiny::req(rv$maf, c0)
-      args <- list(maf = rv$maf, gene = c0$gene, showMutationRate = c0$rate)
+      # Adaptive fonts: scale label/legend text by how many positions are
+      # annotated on this gene, repel labels, and rotate them vertical when
+      # the labelled positions are densely packed along the protein.
+      d <- as.data.frame(rv$maf@data)
+      n_lab <- 4
+      dense <- FALSE
+      if (isTRUE(c0$label)) {
+        n_lab <- sum(d$Hugo_Symbol == c0$gene, na.rm = TRUE)
+        pos <- tryCatch({
+          aa_col <- if (!is.null(c0$aa)) c0$aa
+                    else if ("HGVSp_Short" %in% colnames(d)) "HGVSp_Short"
+                    else if ("Protein_Change" %in% colnames(d)) "Protein_Change"
+                    else NULL
+          if (is.null(aa_col)) integer(0) else {
+            p <- suppressWarnings(as.integer(
+              sub("^[^0-9]*([0-9]+).*$", "\\1",
+                  as.character(d[d$Hugo_Symbol == c0$gene, aa_col]))))
+            p[is.finite(p)]
+          }
+        }, error = function(e) integer(0))
+        span <- if (length(pos) >= 2) diff(range(pos)) + 1 else Inf
+        dense <- length(pos) >= 12 && (length(pos) / span) > 0.04
+      }
+      fs <- adaptive_cex(n_lab, n_ref = 10, lo = 0.65, hi = 1.3)
+      args <- list(maf = rv$maf, gene = c0$gene, showMutationRate = c0$rate,
+                   repel = TRUE,
+                   labPosSize = round(fs, 2),
+                   legendTxtSize = round(max(0.8, min(1, fs)), 2),
+                   axisTextSize = rep(round(max(0.9, min(1.1, fs)), 2), 2),
+                   domainLabelSize = round(max(0.7, min(0.9, fs)), 2),
+                   titleSize = c(1.05, 1))
+      if (dense) args$labPosAngle <- 90
       if (!is.null(c0$aa)) args$AACol <- c0$aa
       if (c0$label) args$labelPos <- "all"
       do.call(maftools::lollipopPlot, args)
-    })
+    }
+    output$plot <- render_base_plot(draw_lolli)
+    register_figure_download(output, input, "plot", draw_lolli, "wes_lollipop",
+                             width = 12, height = 6)
   })
 }

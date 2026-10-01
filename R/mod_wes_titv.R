@@ -52,9 +52,9 @@ mod_wes_titv_ui <- function(id) {
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel("TiTv",     preview_plot_ui(ns("titv"))),
-      bslib::nav_panel("VAF",      preview_plot_ui(ns("vaf"))),
-      bslib::nav_panel(i18n("Rainfall", "Rainfall"), preview_plot_ui(ns("rain")))
+      bslib::nav_panel("TiTv",     preview_plot_ui(ns("titv"), download = TRUE)),
+      bslib::nav_panel("VAF",      preview_plot_ui(ns("vaf"), download = TRUE)),
+      bslib::nav_panel(i18n("Rainfall", "Rainfall"), preview_plot_ui(ns("rain"), download = TRUE))
     )
   )
 }
@@ -135,23 +135,32 @@ mod_wes_titv_server <- function(id, rv, log_rv) {
       )
     })
 
-    output$titv <- render_base_plot(function() {
+    draw_titv <- function() {
       shiny::req(res$titv)
       maftools::plotTiTv(res = res$titv)
-    })
+    }
+    output$titv <- render_base_plot(draw_titv)
+    register_figure_download(output, input, "titv", draw_titv, "wes_titv",
+                             width = 9, height = 6)
 
-    output$vaf <- render_base_plot(function() {
+    draw_vaf <- function() {
       shiny::req(rv$maf, res$cfg)
       if (is.null(res$cfg$vaf)) {
         stop("No VAF column selected. Pick one in the control panel, or this MAF does not carry allele frequencies.")
       }
       maftools::plotVaf(maf = rv$maf, vafCol = res$cfg$vaf)
-    })
+    }
+    output$vaf <- render_base_plot(draw_vaf)
+    register_figure_download(output, input, "vaf", draw_vaf, "wes_vaf",
+                             width = 10, height = 7)
 
-    output$rain <- render_base_plot(function() {
+    draw_rain <- function() {
       shiny::req(rv$maf, res$cfg, res$cfg$tsb)
       maftools::rainfallPlot(maf = rv$maf, tsb = res$cfg$tsb,
                              detectChangePoints = res$cfg$cp, pointSize = 0.6)
-    })
+    }
+    output$rain <- render_base_plot(draw_rain)
+    register_figure_download(output, input, "rain", draw_rain, "wes_rainfall",
+                             width = 12, height = 6)
   })
 }

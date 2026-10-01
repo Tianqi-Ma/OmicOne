@@ -47,7 +47,7 @@ mod_wes_hetero_ui <- function(id) {
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Clusters", "克隆聚类"), preview_plot_ui(ns("plot"))),
+      bslib::nav_panel(i18n("Clusters", "克隆聚类"), preview_plot_ui(ns("plot"), download = TRUE)),
       bslib::nav_panel(i18n("Variants", "变异明细"), shiny::uiOutput(ns("tbl_slot")))
     )
   )
@@ -128,10 +128,13 @@ mod_wes_hetero_server <- function(id, rv, log_rv) {
       )
     })
 
-    output$plot <- render_base_plot(function() {
+    draw_het <- function() {
       shiny::req(res$het)
       maftools::plotClusters(clusters = res$het, tsb = res$sample)
-    })
+    }
+    output$plot <- render_base_plot(draw_het)
+    register_figure_download(output, input, "plot", draw_het,
+                             "wes_heterogeneity", width = 10, height = 7)
 
     output$tbl_slot <- shiny::renderUI({
       if (is.null(res$het)) return(wes_no_maf())
