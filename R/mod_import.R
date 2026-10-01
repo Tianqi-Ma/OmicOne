@@ -27,6 +27,11 @@ mod_import_ui <- function(id) {
             and the format that matches it (RDS if it's a saved Seurat object).",
       zh = "<b>只是想体验一下？</b>选择<b>演示数据</b>并点击加载，几秒内即可试用整个流程。要使用自己的数据，
             请选择<b>上传文件</b>并选中与之匹配的格式（如果是已保存的 Seurat 对象则选 RDS）。"),
+    read = list(
+      en = "The overview shows cells, genes, and counts per cell — a first
+            sanity check that the matrix loaded the right way round (genes in
+            rows) and the numbers are in the expected ballpark.",
+      zh = "总览展示细胞数、基因数与每细胞计数——第一项合理性检查：确认矩阵方向正确（基因为行）、数量级符合预期。"),
     example = list(
       en = "The bundled demo loads instantly with no download. Or upload
                <code>pbmc.rds</code> (a Seurat object), a 10x <code>.h5</code>, or a
@@ -103,11 +108,17 @@ mod_import_ui <- function(id) {
   }
   step_container(
     title     = list(en = "Import & inspect", zh = "导入与检查"),
+    subtitle  = list(en = "Load counts or a Seurat object and inspect the overview.",
+                     zh = "载入计数或 Seurat 对象，并查看数据总览。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Overview", "总览"),        preview_plot_ui(ns("ov_plot"))),
+      bslib::nav_panel(i18n("Overview", "总览"),        preview_plot_ui(ns("ov_plot"),
+        guide = list(en = "An overview of the loaded dataset will be drawn here.",
+                     zh = "运行后，这里将绘制已载入数据集的总览。"),
+        caption = list(en = "Dataset overview: cells, genes, and counts-per-cell distributions.",
+                       zh = "数据总览：细胞数、基因数与每细胞计数分布。"))),
       bslib::nav_panel(i18n("Cell metadata", "细胞元数据"), tbl_out(ns("meta_tbl"))),
       bslib::nav_panel(i18n("Counts preview", "表达矩阵预览"), tbl_out(ns("counts_tbl")))
     )

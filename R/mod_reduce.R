@@ -30,6 +30,11 @@ mod_reduce_ui <- function(id) {
             curve flattens.",
       zh = "选择高变基因的排序方式、保留多少个，以及要计算多少个主成分。右侧的肘部图显示
             每个主成分捕获了多少变异 &mdash; 保留曲线变平之前的主成分。"),
+    read = list(
+      en = "Left: the most variable genes — these drive everything downstream.
+            Right: the elbow plot; keep the PCs before the curve flattens —
+            anything past the elbow is mostly noise.",
+      zh = "左图：变异最大的基因——它们驱动下游所有分析。右图：肘部图；保留曲线变平之前的主成分——拐点之后基本是噪声。"),
     example = list(
       en = "From 20,000 genes you keep ~2,000 variable ones, then summarise them
                as 50 PCs; the first ~20 usually carry the real structure.",
@@ -59,9 +64,15 @@ mod_reduce_ui <- function(id) {
     run_button(ns("run"), "Select features & run PCA", "选择特征并运行 PCA")
   )
   step_container(title = list(en = "Feature selection & PCA", zh = "特征选择与 PCA"),
+                 subtitle = list(en = "Highly variable genes, then PCA compression.",
+                                 zh = "高变基因筛选，再做 PCA 压缩。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "Variable features and the PCA elbow plot will be drawn here.",
+                                zh = "运行后，这里将绘制高变基因图与 PCA 肘部图。"),
+                   caption = list(en = "Highly variable genes (left) and variance captured per PC (right).",
+                                  zh = "高变基因（左）与每个主成分捕获的方差（右）。")))
 }
 
 #' @rdname mod_reduce

@@ -27,6 +27,11 @@ mod_viz_ui <- function(id) {
             <b>Violin / Dot / Feature / Heatmap</b> show expression of the genes
             you type (comma separated). Nothing here changes your object.",
       zh = "选择一种图表类型。<b>按元数据着色的 UMAP</b> 会按某一列为细胞着色。<b>小提琴图 / 点图 / 特征图 / 热图</b>展示你输入的基因（以逗号分隔）的表达。此处的操作不会改动你的对象。"),
+    read = list(
+      en = "Pick a feature to colour cells by expression, or a grouping to
+            compare populations. Use it to verify markers and annotations
+            visually — the plot updates as you change the selection.",
+      zh = "选择一个特征可按表达量为细胞着色，选择一个分组可比较细胞群。改选择时图会即时更新——用它直观验证标志基因与注释。"),
     example = list(
       en = "Type <code>CD3D, MS4A1, LYZ</code> and choose 'Feature plot' to see
                where T cells, B cells and monocytes sit on the UMAP.",
@@ -69,6 +74,8 @@ mod_viz_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Visualize", zh = "可视化"),
+    subtitle  = list(en = "Explore any gene or grouping on the embedding.",
+                     zh = "在嵌入图上自由查看任何基因或分组。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),

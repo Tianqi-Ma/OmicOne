@@ -59,15 +59,19 @@ mod_wes_clin_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = bslib::navset_card_tab(
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      bslib::navset_card_tab(
       bslib::nav_panel(i18n("Clinical enrichment", "临床富集"),
                        preview_plot_ui(ns("enr"), download = TRUE,
                                        guide = list(en = "Genes enriched in one clinical group will be drawn here.",
-                                                    zh = "运行后，这里将绘制在某个临床分组中富集的基因。"))),
+                                                    zh = "运行后，这里将绘制在某个临床分组中富集的基因。"),
+                                       caption = list(en = "Bar length ∝ −log10(p): how strongly each gene's mutation rate differs across clinical groups.",
+                                                      zh = "条长 ∝ −log10(p)：每个基因的突变频率在临床分组间的差异强度。"))),
       bslib::nav_panel(i18n("Pathways", "通路"),   preview_plot_ui(ns("path"), download = TRUE)),
       bslib::nav_panel(i18n("Drugs", "药物"),      preview_plot_ui(ns("drug"), download = TRUE)),
       bslib::nav_panel(i18n("Enrichment table", "富集结果表"), shiny::uiOutput(ns("tbl_slot")))
-    )
+    ))
   )
 }
 
@@ -132,6 +136,25 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
                   if (is.na(n_sig)) "-" else n_sig),
         stat_tile(i18n("p cutoff", "p 阈值"), res$pval)
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      if (!isTRUE(res$ran)) return(NULL)
+      if (is.null(res$enr)) {
+        return(insight_bar(
+          "Pathway and drug analyses are done; no clinical feature was attached, so enrichment testing was skipped.",
+          "通路与药物分析已完成；因未附带临床变量，富集检验被跳过。"))
+      }
+      n_sig <- tryCatch({
+        d <- as.data.frame(res$enr$groupwise_comparision)
+        sum(d$p_value <= res$pval, na.rm = TRUE)
+      }, error = function(e) NA_integer_)
+      if (is.na(n_sig)) return(NULL)
+      insight_bar(
+        sprintf("<b>%d</b> genes differ across <b>%s</b> at p ≤ %g. The <b>Pathways</b> tab shows which canonical pathways the cohort hits; <b>Drugs</b> ranks repurposing candidates.",
+                n_sig, res$feature, res$pval),
+        sprintf("<b>%d</b> 个基因在 <b>%s</b> 各组间的突变频率不同（p ≤ %g）。<b>通路</b>页签展示队列命中的经典通路；<b>药物</b>页签列出老药新用候选。",
+                n_sig, res$feature, res$pval))
     })
 
     draw_enr <- with_text_boost(function() {

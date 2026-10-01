@@ -39,6 +39,11 @@ mod_clinical_ui <- function(id) {
             exploratory cutpoint -- it is selected to maximise separation, so
             its p-value is optimistic.",
       zh = "上传<b>每位患者一行</b>的 CSV/TSV 文件，然后指定 ID、时间和终点列。可按临床列分组，也可按<b>细胞组成</b>分组（每个样本中某种细胞类型的占比，分高低两组）。<b>最优切点</b>仅供探索——它是为了让分离最大化而挑选的，因此 p 值偏乐观。"),
+    read = list(
+      en = "KM curves split patients by a high versus low score. Separation with
+            heavily overlapping confidence bands is suggestive, not proof —
+            check the group sizes before believing it.",
+      zh = "KM 曲线按评分高低把患者分组。置信带大量重叠的分离只能算提示而非证明——采信前请核对各组样本量。"),
     example = list(
       en = "A table with <code>sample, os_months, os_status, stage</code>, then
                \"fraction of Exhausted CD8 T cells, high vs low\" as the grouping.",
@@ -72,11 +77,17 @@ mod_clinical_ui <- function(id) {
 
   step_container(
     title     = list(en = "Clinical data & survival", zh = "临床数据与生存分析"),
+    subtitle  = list(en = "Survival analysis on cell-level scores.",
+                     zh = "基于细胞水平评分的生存分析。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Kaplan-Meier", "生存曲线"), preview_plot_ui(ns("km"))),
+      bslib::nav_panel(i18n("Kaplan-Meier", "生存曲线"), preview_plot_ui(ns("km"),
+        guide = list(en = "Kaplan-Meier curves will be drawn here.",
+                     zh = "运行后，这里将绘制 Kaplan-Meier 生存曲线。"),
+        caption = list(en = "KM curves for the high- vs low-score groups.",
+                       zh = "高分组与低分组的 KM 曲线。"))),
       bslib::nav_panel(i18n("Cox (univariable)", "Cox 单因素"), shiny::uiOutput(ns("cox_slot"))),
       bslib::nav_panel(i18n("Cohort", "队列表"), shiny::uiOutput(ns("cohort_slot")))
     )

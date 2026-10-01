@@ -64,14 +64,18 @@ mod_wes_compare_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = bslib::navset_card_tab(
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      bslib::navset_card_tab(
       bslib::nav_panel(i18n("Forest plot", "森林图"),
                        preview_plot_ui(ns("forest"), download = TRUE,
                                        guide = list(en = "Odds ratios for group-biased genes will be drawn here.",
-                                                    zh = "运行后，这里将绘制偏向某一组的基因的森林图。"))),
+                                                    zh = "运行后，这里将绘制偏向某一组的基因的森林图。"),
+                                       caption = list(en = "Dot = odds ratio, whiskers = 95% CI; right of 1 = mutated more often in group 1.",
+                                                      zh = "圆点＝比值比，横须＝95% CI；1 以右＝在第 1 组中突变更多。"))),
       bslib::nav_panel(i18n("Frequencies", "频率对比"), preview_plot_ui(ns("cobar"), download = TRUE)),
       bslib::nav_panel(i18n("Results", "结果表"), shiny::uiOutput(ns("tbl_slot")))
-    )
+    ))
   )
 }
 
@@ -159,6 +163,21 @@ mod_wes_compare_server <- function(id, rv, log_rv) {
                   tryCatch(nrow(as.data.frame(c0$res$results)), error = function(e) "-")),
         stat_tile(i18n("Significant", "显著基因数"), if (is.na(n_sig)) "-" else n_sig)
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      c0 <- res$cmp
+      if (is.null(c0)) return(NULL)
+      n_sig <- tryCatch(sum(as.data.frame(c0$res$results)$pval <= res$pval, na.rm = TRUE),
+                        error = function(e) NA_integer_)
+      if (is.na(n_sig)) return(NULL)
+      insight_bar(
+        sprintf("<b>%d</b> genes differ between <b>%s</b> (n=%s) and <b>%s</b> (n=%s) at p ≤ %g. The <b>Frequencies</b> tab shows the raw percentages behind each odds ratio.",
+                n_sig, res$l1, format(c0$n1, big.mark = ","), res$l2,
+                format(c0$n2, big.mark = ","), res$pval),
+        sprintf("<b>%d</b> 个基因在 <b>%s</b>（n=%s）与 <b>%s</b>（n=%s）之间突变频率不同（p ≤ %g）。<b>频率对比</b>页签展示每个比值比背后的原始百分比。",
+                n_sig, res$l1, format(c0$n1, big.mark = ","), res$l2,
+                format(c0$n2, big.mark = ","), res$pval))
     })
 
     draw_forest <- with_text_boost(function() {

@@ -29,6 +29,11 @@ mod_doublet_ui <- function(id) {
             cells but label them) or remove them (drop the flagged cells).",
       zh = "推荐的 <b>scDblFinder</b> 方法会为每个细胞打分，评估其像双细胞的程度。
             可选择仅标记双细胞（保留所有细胞但加上标签）或去除它们（丢弃被标记的细胞）。"),
+    read = list(
+      en = "Every cell gets a doublet score — high means its profile looks like
+            two cells averaged. The summary says how many were flagged; expect
+            roughly 1% per 1,000 loaded cells.",
+      zh = "每个细胞得到一个双细胞分数——越高表示其表达谱越像两个细胞的平均。汇总会给出被标记的数量；经验上约为每 1,000 个上机细胞 1%。"),
     example = list(
       en = "Two cells of different types share a droplet and look like a novel
                'hybrid' population &mdash; scDblFinder flags them so you can drop them.",
@@ -59,9 +64,15 @@ mod_doublet_ui <- function(id) {
     run_button(ns("run"), "Detect doublets", "检测双细胞")
   )
   step_container(title = list(en = "Doublet removal", zh = "去除双细胞"),
+                 subtitle = list(en = "Score and remove droplets that captured two cells.",
+                                 zh = "为捕获了两个细胞的液滴打分并去除。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "Doublet scores and the flagged/kept breakdown will be drawn here.",
+                                zh = "运行后，这里将绘制双细胞分数与标记/保留构成。"),
+                   caption = list(en = "Doublet score distribution and the flagging result.",
+                                  zh = "双细胞分数分布与标记结果。")))
 }
 
 #' @rdname mod_doublet

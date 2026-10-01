@@ -29,6 +29,11 @@ mod_normalize_ui <- function(id) {
             regularized negative binomial and often needs no extra scaling.",
       zh = "<b>LogNormalize</b> 将每个细胞缩放到统一的总量后再取对数（稳健的默认方法）。
             <b>SCT</b> 用正则化负二项模型对计数建模，通常无需额外缩放。"),
+    read = list(
+      en = "The before/after view should show the depth effect disappearing:
+            after normalization, total counts per cell no longer drive the
+            spread.",
+      zh = "前后对比应显示深度效应消失：归一化后，每细胞总计数不再主导数据分布。"),
     example = list(
       en = "A cell with 20,000 UMIs and one with 5,000 UMIs are put on the same
                scale so a shared marker reads similarly in both.",
@@ -55,9 +60,15 @@ mod_normalize_ui <- function(id) {
     run_button(ns("run"), "Normalize", "归一化")
   )
   step_container(title = list(en = "Normalization", zh = "归一化"),
+                 subtitle = list(en = "Make cells sequenced to different depths comparable.",
+                                 zh = "使测序深度不同的细胞可相互比较。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "Before/after normalization diagnostics will be drawn here.",
+                                zh = "运行后，这里将绘制归一化前后的诊断图。"),
+                   caption = list(en = "Normalization diagnostics: the depth effect before vs after.",
+                                  zh = "归一化诊断：深度效应的前后对比。")))
 }
 
 #' @rdname mod_normalize

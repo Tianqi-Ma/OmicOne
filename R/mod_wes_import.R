@@ -77,11 +77,13 @@ mod_wes_import_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = bslib::navset_card_tab(
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      bslib::navset_card_tab(
       bslib::nav_panel(i18n("Per-sample", "各样本"),   shiny::uiOutput(ns("samp_slot"))),
       bslib::nav_panel(i18n("Per-gene", "各基因"),     shiny::uiOutput(ns("gene_slot"))),
       bslib::nav_panel(i18n("Clinical", "临床数据"),   shiny::uiOutput(ns("clin_slot")))
-    )
+    ))
   )
 }
 
@@ -166,6 +168,21 @@ mod_wes_import_server <- function(id, rv, log_rv) {
         stat_tile(i18n("Variants", "变异总数"), fmt(ov$variants)),
         stat_tile(i18n("Median / sample", "中位数/样本"), fmt(ov$median_per_sample))
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      maf <- rv$maf
+      if (is.null(maf)) return(NULL)
+      ov <- wes_overview(maf)
+      fmt <- function(x) if (is.null(x) || is.na(x)) "-" else format(round(x), big.mark = ",")
+      top <- if (is.na(ov$top_gene)) "-" else sprintf("%s (%.0f%%)", ov$top_gene, ov$top_pct)
+      insight_bar(
+        sprintf("Loaded <b>%s</b> samples with <b>%s</b> variants across <b>%s</b> genes — median %s per sample. Top gene: <b>%s</b>.",
+                fmt(ov$samples), fmt(ov$variants), fmt(ov$genes),
+                fmt(ov$median_per_sample), top),
+        sprintf("已载入 <b>%s</b> 个样本、<b>%s</b> 个变异、<b>%s</b> 个基因——每样本中位 %s 个。最高频基因：<b>%s</b>。",
+                fmt(ov$samples), fmt(ov$variants), fmt(ov$genes),
+                fmt(ov$median_per_sample), top))
     })
 
     tbl_slot <- function(out_id) {

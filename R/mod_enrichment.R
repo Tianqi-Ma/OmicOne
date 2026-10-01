@@ -31,6 +31,11 @@ mod_enrichment_ui <- function(id) {
             database and matching species. <b>Run the Markers step first</b> so
             the DE results are available.",
       zh = "<b>过表达分析（ORA）</b>检验某分组的标志基因命中某通路是否超出随机预期。<b>GSEA</b> 则使用完整的排序基因列表，因此能检测到协同的微弱变化。请选择数据库并匹配物种。<b>请先运行“标志基因”步骤</b>，以便获得差异表达结果。"),
+    read = list(
+      en = "Each bar or point is a gene set, ranked by significance. Read the
+            top hits together with the genes that drove them — a hit resting on
+            a single gene is fragile.",
+      zh = "每根条/每个点是一个基因集，按显著性排序。解读头部结果时要结合驱动它的基因——仅由单个基因支撑的结果不可靠。"),
     example = list(
       en = "For a cytotoxic T-cell cluster, GO terms like
                <code>T cell mediated cytotoxicity</code> should rise to the top.",
@@ -71,10 +76,16 @@ mod_enrichment_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Enrichment & GSEA", zh = "富集与 GSEA"),
+    subtitle  = list(en = "Pathways and gene sets behind your gene list.",
+                     zh = "基因列表背后的通路与基因集。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("preview"))
+    preview   = preview_plot_ui(ns("preview"),
+      guide = list(en = "Enrichment results will be drawn here.",
+                   zh = "运行后，这里将绘制富集分析结果。"),
+      caption = list(en = "Enriched gene sets ranked by significance.",
+                     zh = "按显著性排序的富集基因集。"))
   )
 }
 

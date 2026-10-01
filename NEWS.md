@@ -1,12 +1,23 @@
 # OmicOne 0.6.1 (unreleased)
 
 ## Added
+- **Global progress chip** in the topbar (done/total with a mini bar) and a
+  floating **"next step" chip** that appears bottom-right once the current
+  step completes — click it to jump to the next unfinished step.
+- **Auto-generated insight bars** above every WES result: one bilingual
+  sentence computed from the actual numbers (e.g. median TMB and where it
+  sits against the immunotherapy-relevant line; how many genes pass the FDR
+  cutoff; MATH score with its clonality reading; log-rank p with a
+  power caveat when groups are small).
+- **Figure captions**: the primary plot of every step (WES and single-cell)
+  carries a one-line caption to the left of the export row.
 - **Step subtitles and reading guides**: every WES step now shows an
   always-visible one-line subtitle under its title, the explainer gains a
   "How to read the result / 如何解读结果" facet (axes, colours, which
   patterns matter, rough cutoffs), and the empty preview canvas shows a
   centred guide — what the step will draw and how to run it — that steps
-  aside automatically once the plot renders (pure CSS, no JS).
+  aside automatically once the plot renders (pure CSS, no JS). All 20
+  single-cell steps gained the same three layers.
 - **Figure export on every WES plot**: each preview now carries a download row
   with a format selector (PNG / JPEG / vector PDF) and, for raster formats, a
   DPI field (72–1200). The export replays the exact draw closure used on

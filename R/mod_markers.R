@@ -29,6 +29,11 @@ mod_markers_ui <- function(id) {
             <b>only positive</b> markers if you only care about what a cluster
             expresses <i>more</i> than others.",
       zh = "<b>Wilcoxon</b> 是快速、稳健的默认差异检验。提高 log fold-change 或 min.pct 可只保留更强、更特异的标志基因。若只关心某个簇比其他簇<i>更高</i>表达的基因，可只保留<b>正向</b>标志基因。"),
+    read = list(
+      en = "The plot shows the top markers per cluster: dot size = fraction of
+            cells expressing the gene, colour = mean expression. A good marker
+            is strong in one cluster and absent everywhere else.",
+      zh = "图中展示每个簇的头部标志基因：点大小＝表达该基因的细胞比例，颜色＝平均表达量。好的标志基因在一个簇中强表达、在其他簇中缺失。"),
     example = list(
       en = "For a T-cell cluster you would expect markers like <code>CD3D</code>,
                <code>CD3E</code> and <code>TRAC</code> at the top of the list.",
@@ -64,11 +69,17 @@ mod_markers_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Marker genes", zh = "标志基因"),
+    subtitle  = list(en = "Find the genes that define each cluster.",
+                     zh = "找出定义每个簇的基因。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = shiny::tagList(
-      preview_plot_ui(ns("preview")),
+      preview_plot_ui(ns("preview"),
+        guide = list(en = "Top markers per cluster will be drawn here.",
+                     zh = "运行后，这里将绘制每个簇的头部标志基因。"),
+        caption = list(en = "Top markers per cluster (dot size = % expressing, colour = mean level).",
+                       zh = "各簇头部标志基因（点大小＝表达比例，颜色＝平均表达量）。")),
       shiny::div(class = "omicone-table", shiny::uiOutput(ns("table")))
     )
   )

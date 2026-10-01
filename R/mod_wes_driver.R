@@ -68,14 +68,18 @@ mod_wes_driver_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = bslib::navset_card_tab(
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      bslib::navset_card_tab(
       bslib::nav_panel(i18n("Oncodrive", "Oncodrive"),
                        preview_plot_ui(ns("drv"), download = TRUE,
                                        guide = list(en = "Genes whose mutations cluster suspiciously will be drawn here.",
-                                                    zh = "运行后，这里将绘制突变异常聚集的候选驱动基因。"))),
+                                                    zh = "运行后，这里将绘制突变异常聚集的候选驱动基因。"),
+                                       caption = list(en = "Bubble = gene; x = mutation clustering score; size = mutated samples. Only genes passing the FDR cutoff are drawn.",
+                                                      zh = "气泡＝基因；横轴＝突变聚集得分；大小＝突变样本数。仅绘制通过 FDR 阈值的基因。"))),
       bslib::nav_panel(i18n("Interactions", "基因互作"), preview_plot_ui(ns("int"), download = TRUE)),
       bslib::nav_panel(i18n("Driver table", "驱动基因表"), shiny::uiOutput(ns("tbl_slot")))
-    )
+    ))
   )
 }
 
@@ -136,6 +140,29 @@ mod_wes_driver_server <- function(id, rv, log_rv) {
         stat_tile(i18n("Below FDR", "低于 FDR"), if (is.na(sig)) "-" else sig),
         stat_tile(i18n("Strongest", "最显著"), topg)
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      d <- res$drv
+      if (is.null(d)) return(NULL)
+      df <- as.data.frame(d)
+      tested <- nrow(df)
+      sig_n <- if ("fdr" %in% colnames(df)) sum(df$fdr <= res$fdr, na.rm = TRUE) else 0L
+      topg <- if (tested && all(c("Hugo_Symbol", "fdr") %in% colnames(df)))
+        as.character(df$Hugo_Symbol[which.min(df$fdr)]) else "-"
+      if (sig_n > 0) {
+        insight_bar(
+          sprintf("<b>%d</b> of %s tested genes pass FDR ≤ %g — strongest: <b>%s</b>. The <b>Interactions</b> tab shows which of them co-occur or avoid each other.",
+                  sig_n, format(tested, big.mark = ","), res$fdr, topg),
+          sprintf("%s 个受检基因中有 <b>%d</b> 个通过 FDR ≤ %g——最显著为 <b>%s</b>。<b>互作</b>页签可查看它们之间的共现与互斥。",
+                  format(tested, big.mark = ","), sig_n, res$fdr, topg))
+      } else {
+        insight_bar(
+          sprintf("No gene passes FDR ≤ %g among the %s tested — normal on small cohorts; lower <b>minimum mutations</b> or loosen the FDR cutoff to look deeper.",
+                  res$fdr, format(tested, big.mark = ",")),
+          sprintf("受检的 %s 个基因无一通过 FDR ≤ %g——小队列中这是正常结果；可降低<b>最小突变数</b>或放宽 FDR 阈值再探。",
+                  format(tested, big.mark = ","), res$fdr))
+      }
     })
 
     draw_drv <- function() {

@@ -260,6 +260,48 @@ body { background: var(--sc-bg); color: var(--sc-text); }
 .omicone-plotwrap > .shiny-plot-output:empty { flex: 0 0 auto; }
 .omicone-plotwrap > .omicone-fig-dl { flex: 0 0 auto; }
 
+/* ---- global progress chip (topbar) ---- */
+.omicone-progress { display: inline-flex; align-items: center; gap: .45rem; margin: 0 .2rem; }
+.omicone-progress-num { font-size: .78rem; font-weight: 600; color: var(--sc-muted); }
+.omicone-progress-bar {
+  width: 64px; height: 5px; border-radius: 999px;
+  background: var(--sc-panel); border: 1px solid var(--sc-border); overflow: hidden;
+}
+.omicone-progress-fill {
+  height: 100%; background: linear-gradient(90deg, var(--sc-accent), var(--sc-ok));
+  transition: width .3s ease;
+}
+
+/* ---- next-step chip (floating, bottom-right) ---- */
+.omicone-nextchip {
+  position: fixed; right: 1.4rem; bottom: 1.2rem; z-index: 60;
+  display: inline-flex; align-items: baseline; gap: .4rem;
+  padding: .5rem .95rem; border-radius: 999px; cursor: pointer; text-decoration: none;
+  background: var(--sc-card);
+  border: 1px solid color-mix(in srgb, var(--sc-accent) 55%, transparent);
+  color: var(--sc-text); font-size: .85rem; box-shadow: var(--sc-elev);
+  animation: omicone-rise .25s ease; transition: transform .15s ease, border-color .15s ease;
+}
+.omicone-nextchip:hover { border-color: var(--sc-accent); transform: translateY(-2px); }
+.omicone-nextchip .omicone-next-label { color: var(--sc-muted); font-size: .78rem; }
+@keyframes omicone-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---- insight bar (auto result summary, above the preview) ---- */
+.omicone-insight {
+  margin: 0 0 .5rem; padding: .45rem .8rem;
+  font-size: .85rem; line-height: 1.5; color: var(--sc-text);
+  background: color-mix(in srgb, var(--sc-accent) 7%, transparent);
+  border-left: 3px solid var(--sc-accent); border-radius: .35rem;
+}
+.omicone-plotwrap > .shiny-html-output { flex: 0 0 auto; }
+
+/* ---- figure footer: caption (left) + export row (right) ---- */
+.omicone-figfoot { display: flex; align-items: center; gap: .8rem; margin-top: .3rem; }
+.omicone-figfoot .omicone-fig-dl { margin-top: 0; }
+.omicone-figcap { font-size: .78rem; color: var(--sc-muted); line-height: 1.35; }
+.omicone-plotwrap > .omicone-figfoot { flex: 0 0 auto; }
+.omicone-plotwrap > .omicone-figcap { flex: 0 0 auto; margin-top: .3rem; }
+
 /* ---- figure export row ---- */
 .omicone-fig-dl {
   display: flex; align-items: center; justify-content: flex-end; gap: .5rem;

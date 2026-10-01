@@ -149,6 +149,16 @@ run_button <- function(id, en = "Run this step", zh = "运行此步骤") {
   )
 }
 
+#' Slim "insight" bar: an auto-generated one-sentence result summary
+#'
+#' Rendered above the preview once a step has run. Modules place a
+#' `uiOutput` first in their `preview` tag and render this from the server.
+#' @param en,zh The sentence (may contain inline HTML).
+#' @keywords internal
+insight_bar <- function(en, zh) {
+  shiny::div(class = "omicone-insight", i18n(en, zh))
+}
+
 #' Compact summary pill (used in the slim header strip)
 #' @param title,value Character/numeric.
 #' @keywords internal

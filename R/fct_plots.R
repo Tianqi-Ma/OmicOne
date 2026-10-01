@@ -56,9 +56,12 @@ sc_palette <- function(n = 8, type = "discrete") {
 #'   will show. Rendered as a centred placeholder inside the empty preview area
 #'   before the first run, and hidden automatically (pure CSS) once the plot
 #'   output has content.
+#' @param caption Optional bilingual `list(en =, zh =)` figure caption shown
+#'   left of the export row (always visible; the export controls keep their
+#'   hover fade).
 #' @keywords internal
 preview_plot_ui <- function(id, height = "100%", download = FALSE,
-                            guide = NULL) {
+                            guide = NULL, caption = NULL) {
   g <- NULL
   if (!is.null(guide)) {
     g <- shiny::div(
@@ -72,26 +75,35 @@ preview_plot_ui <- function(id, height = "100%", download = FALSE,
     )
   }
   out <- shiny::plotOutput(id, height = height)
-  if (!isTRUE(download)) return(shiny::tagList(g, out))
-  shiny::tagList(
-    g,
-    out,
-    shiny::div(
-      class = "omicone-fig-dl",
-      shiny::downloadButton(paste0(id, "_dl"), i18n("Download figure", "下载图片"),
-                            class = "btn-sm"),
-      shiny::selectInput(paste0(id, "_dlfmt"), NULL,
-                         c("PNG" = "png", "JPEG" = "jpg", "PDF (vector)" = "pdf"),
-                         selectize = FALSE, width = "118px"),
-      shiny::conditionalPanel(
-        sprintf("input['%s'] != 'pdf'", paste0(id, "_dlfmt")),
-        shiny::div(class = "omicone-fig-dl-dpi",
-                   shiny::tags$span("DPI", class = "omicone-fig-dl-unit"),
-                   shiny::numericInput(paste0(id, "_dpi"), NULL, value = 300,
-                                       min = 72, max = 1200, step = 50,
-                                       width = "88px")))
-    )
+  cap <- NULL
+  if (!is.null(caption)) {
+    cap <- shiny::div(class = "omicone-figcap",
+                      if (is.list(caption)) i18n(caption$en, caption$zh)
+                      else caption)
+  }
+  if (!isTRUE(download)) return(shiny::tagList(g, out, cap))
+  dl <- shiny::div(
+    class = "omicone-fig-dl",
+    shiny::downloadButton(paste0(id, "_dl"), i18n("Download figure", "下载图片"),
+                          class = "btn-sm"),
+    shiny::selectInput(paste0(id, "_dlfmt"), NULL,
+                       c("PNG" = "png", "JPEG" = "jpg", "PDF (vector)" = "pdf"),
+                       selectize = FALSE, width = "118px"),
+    shiny::conditionalPanel(
+      sprintf("input['%s'] != 'pdf'", paste0(id, "_dlfmt")),
+      shiny::div(class = "omicone-fig-dl-dpi",
+                 shiny::tags$span("DPI", class = "omicone-fig-dl-unit"),
+                 shiny::numericInput(paste0(id, "_dpi"), NULL, value = 300,
+                                     min = 72, max = 1200, step = 50,
+                                     width = "88px")))
   )
+  # caption stays always-visible on the left; export controls keep their
+  # hover-fade on the right
+  if (!is.null(cap)) {
+    return(shiny::tagList(g, out,
+                          shiny::div(class = "omicone-figfoot", cap, dl)))
+  }
+  shiny::tagList(g, out, dl)
 }
 
 #' Register a figure download handler for a preview plot

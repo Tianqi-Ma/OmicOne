@@ -28,6 +28,11 @@ mod_integrate_ui <- function(id) {
             if you have a single sample or want to inspect the raw structure.",
       zh = "选择标识批次/样本的元数据列，再选择方法。<b>Harmony</b> 快速且是不错的默认。
             若只有单个样本或想查看未校正的原始结构，请选择 <b>none</b>。"),
+    read = list(
+      en = "Compare before with after: cells of the same type should mix across
+            batches while distinct types stay apart. Types collapsing into each
+            other means the integration was too aggressive.",
+      zh = "对比整合前后：相同类型的细胞应跨批次混合，不同类型应保持分离。类型互相塌缩说明整合强度过大。"),
     example = list(
       en = "Cells from two samples forming two separate clumps that should
                overlap — integration aligns them.",
@@ -49,9 +54,15 @@ mod_integrate_ui <- function(id) {
     run_button(ns("run"), "Run integration", "运行整合")
   )
   step_container(title = list(en = "Batch integration", zh = "批次整合"),
+                 subtitle = list(en = "Align batches so the same cell type sits together.",
+                                 zh = "对齐批次，使相同细胞类型聚在一起。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "Before/after batch-mixing will be drawn here.",
+                                zh = "运行后，这里将绘制整合前后的批次混合对比。"),
+                   caption = list(en = "Batch mixing before vs after integration.",
+                                  zh = "整合前后的批次混合对比。")))
 }
 
 #' @rdname mod_integrate

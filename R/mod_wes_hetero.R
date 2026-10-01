@@ -56,13 +56,17 @@ mod_wes_hetero_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = bslib::navset_card_tab(
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      bslib::navset_card_tab(
       bslib::nav_panel(i18n("Clusters", "克隆聚类"),
                        preview_plot_ui(ns("plot"), download = TRUE,
                                        guide = list(en = "The chosen sample's VAF clusters will be drawn here.",
-                                                    zh = "运行后，这里将绘制所选样本的 VAF 聚类图。"))),
+                                                    zh = "运行后，这里将绘制所选样本的 VAF 聚类图。"),
+                                       caption = list(en = "Each point = one mutation placed by its VAF; top curve = density; peaks near 0.5 = clonal.",
+                                                      zh = "每个点＝一个按 VAF 定位的突变；上方曲线＝密度；0.5 附近的峰＝克隆性。"))),
       bslib::nav_panel(i18n("Variants", "变异明细"), shiny::uiOutput(ns("tbl_slot")))
-    )
+    ))
   )
 }
 
@@ -139,6 +143,28 @@ mod_wes_hetero_server <- function(id, rv, log_rv) {
         stat_tile(i18n("Clusters", "克隆数"), if (is.na(n_cl)) "-" else n_cl),
         stat_tile("MATH", if (is.na(math)) "-" else math)
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      if (is.null(res$het)) return(NULL)
+      d <- tryCatch(het_df(), error = function(e) NULL)
+      if (is.null(d)) return(NULL)
+      math <- tryCatch(round(unique(d$MATH)[1], 1), error = function(e) NA_real_)
+      n_cl <- tryCatch(length(unique(d$cluster)), error = function(e) NA_integer_)
+      if (is.na(n_cl)) return(NULL)
+      verdict_en <- if (is.na(math)) ""
+        else if (math > 30) " — reads as a heterogeneous tumour"
+        else if (math < 20) " — close to clonal"
+        else " — moderately heterogeneous"
+      verdict_zh <- if (is.na(math)) ""
+        else if (math > 30) "——属于高异质性肿瘤"
+        else if (math < 20) "——接近单克隆"
+        else "——中等异质性"
+      insight_bar(
+        sprintf("Sample <b>%s</b>: <b>%d</b> VAF cluster(s), MATH <b>%s</b>%s. Peaks near 0.5 are clonal; lower peaks are subclones.",
+                res$sample, n_cl, if (is.na(math)) "?" else math, verdict_en),
+        sprintf("样本 <b>%s</b>：<b>%d</b> 个 VAF 聚类，MATH <b>%s</b>%s。0.5 附近的峰为克隆性；更低的峰为亚克隆。",
+                res$sample, n_cl, if (is.na(math)) "?" else math, verdict_zh))
     })
 
     draw_het <- with_text_boost(function() {

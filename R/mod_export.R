@@ -26,6 +26,11 @@ mod_export_ui <- function(id) {
             Python/Scanpy (best-effort, needs SeuratDisk). The R script lists every
             step in order -- you only need to set the input path where it says so.",
       zh = "选择 <b>RDS</b> 以便在 R/Seurat 中重新载入对象，或选择 <b>.h5ad</b> 用于 Python/Scanpy（尽力而为，需要 SeuratDisk）。该 R 脚本会按顺序列出每一步，你只需在提示处设置输入路径。"),
+    read = list(
+      en = "Every export replays the current object state. The log lists each
+            step with its parameters — enough for anyone to reproduce the
+            analysis from scratch.",
+      zh = "每次导出都保存当前对象的状态。日志列出每一步及其参数——足以让任何人从头复现该分析。"),
     example = list(
       en = "Re-run with <code>source(\"omicone_analysis.R\")</code> after
                editing the <code>input_path</code> line at the top.",
@@ -53,6 +58,8 @@ mod_export_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Export & reproducibility", zh = "导出与复现"),
+    subtitle  = list(en = "Take the object, the tables, and a reproducible log with you.",
+                     zh = "带走对象、表格与可复现日志。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),

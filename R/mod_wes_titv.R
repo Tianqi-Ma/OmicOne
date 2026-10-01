@@ -62,13 +62,17 @@ mod_wes_titv_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = bslib::navset_card_tab(
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      bslib::navset_card_tab(
       bslib::nav_panel("TiTv",     preview_plot_ui(ns("titv"), download = TRUE,
                                        guide = list(en = "Transition/transversion spectra for every sample will be drawn here.",
-                                                    zh = "运行后，这里将绘制每个样本的转换/颠换图谱。"))),
+                                                    zh = "运行后，这里将绘制每个样本的转换/颠换图谱。"),
+                                       caption = list(en = "Boxplots: per-sample share of the six base changes; bars: cohort totals.",
+                                                      zh = "箱线图：每样本六类碱基替换的占比；柱条：队列汇总。"))),
       bslib::nav_panel("VAF",      preview_plot_ui(ns("vaf"), download = TRUE)),
       bslib::nav_panel(i18n("Rainfall", "Rainfall"), preview_plot_ui(ns("rain"), download = TRUE))
-    )
+    ))
   )
 }
 
@@ -146,6 +150,27 @@ mod_wes_titv_server <- function(id, rv, log_rv) {
         stat_tile(i18n("VAF column", "VAF 列"),
                   res$cfg$vaf %||% i18n("none", "无"))
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      tv <- res$titv
+      if (is.null(tv)) return(NULL)
+      frac <- tryCatch(as.data.frame(tv$fraction.contribution),
+                       error = function(e) NULL)
+      if (is.null(frac) || !all(c("C>T", "C>A") %in% colnames(frac))) return(NULL)
+      ct <- mean(frac[["C>T"]], na.rm = TRUE)
+      ca <- mean(frac[["C>A"]], na.rm = TRUE)
+      verdict_en <- if (isTRUE(ca >= 25)) "a C>A share this high points at tobacco exposure"
+                    else if (isTRUE(ct >= 40)) "a C>T-led spectrum is the normal ageing background"
+                    else "no single base change dominates"
+      verdict_zh <- if (isTRUE(ca >= 25)) "C>A 占比如此之高，提示烟草暴露"
+                    else if (isTRUE(ct >= 40)) "以 C>T 为主是正常的衰老背景"
+                    else "没有单一碱基替换占主导"
+      insight_bar(
+        sprintf("C>T accounts for <b>%.1f%%</b> of substitutions, C>A for <b>%.1f%%</b> — %s.",
+                ct, ca, verdict_en),
+        sprintf("C>T 占碱基替换的 <b>%.1f%%</b>，C>A 占 <b>%.1f%%</b>——%s。",
+                ct, ca, verdict_zh))
     })
 
     draw_titv <- with_text_boost(function() {

@@ -28,6 +28,11 @@ mod_cluster_ui <- function(id) {
             (PCA, or an integrated embedding like Harmony).",
       zh = "<b>分辨率</b>越高 = 簇越多、越小。尝试多个分辨率并比较。使用你想在其上聚类的
             降维（PCA，或像 Harmony 这样的整合嵌入）。"),
+    read = list(
+      en = "Each colour is one cluster. Resolution controls granularity — more
+            clusters split subtypes, fewer merge them. If one cluster swallows
+            most cells, the resolution is too low.",
+      zh = "每种颜色是一个簇。分辨率控制粒度——簇多则拆分亚型，簇少则合并。若一个簇吞掉大多数细胞，说明分辨率太低。"),
     example = list(
       en = "At resolution 0.2 you may get 6 broad clusters; at 1.0 they split
                into finer subtypes.<br><b>Note:</b> Leiden (algorithm 4) needs the
@@ -64,9 +69,15 @@ mod_cluster_ui <- function(id) {
     run_button(ns("run"), "Run clustering", "运行聚类")
   )
   step_container(title = list(en = "Clustering", zh = "聚类"),
+                 subtitle = list(en = "Group cells by expression similarity.",
+                                 zh = "按表达相似性对细胞分群。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "The clustering result will be drawn here.",
+                                zh = "运行后，这里将绘制聚类结果。"),
+                   caption = list(en = "Cells coloured by cluster at the chosen resolution.",
+                                  zh = "按所选分辨率对细胞按簇着色。")))
 }
 
 #' @rdname mod_cluster

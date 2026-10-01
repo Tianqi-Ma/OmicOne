@@ -32,6 +32,11 @@ mod_dynamic_ui <- function(id) {
             <b>candidate features</b> to scan more genes (slower).",
       zh = "<b>请先运行轨迹步骤</b>，使对象携带谱系与拟时序信息。谱系框留空则使用所有检测到的谱系，
             或填写特定谱系名称（逗号分隔）。增大<b>候选特征数</b>可扫描更多基因（更慢）。"),
+    read = list(
+      en = "Heatmap rows are genes ordered by where they peak along the
+            trajectory; columns are cells in pseudotime. Blocks of genes
+            switching on or off together are the dynamic programmes.",
+      zh = "热图的行为按轨迹上峰值位置排序的基因，列为按拟时序排列的细胞。成块同时开启或关闭的基因即为动态程序。"),
     example = list(
       en = "Along a stem-to-mature lineage, stemness genes fade early while
                maturation markers switch on later — the heatmap shows this as a
@@ -54,9 +59,15 @@ mod_dynamic_ui <- function(id) {
     run_button(ns("run"), "Detect dynamic features", "检测动态特征")
   )
   step_container(title = list(en = "Dynamic features", zh = "动态特征"),
+                 subtitle = list(en = "Genes that switch on or off along a trajectory.",
+                                 zh = "沿轨迹开启或关闭的基因。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "Dynamic gene programmes will be drawn here.",
+                                zh = "运行后，这里将绘制动态基因程序。"),
+                   caption = list(en = "Gene expression dynamics along the trajectory.",
+                                  zh = "基因表达沿轨迹的动态变化。")))
 }
 
 #' @rdname mod_dynamic

@@ -84,6 +84,43 @@ app_server <- function(input, output, session) {
 
   shiny::observeEvent(input$goto, { bslib::nav_select("steps", input$goto) })
 
+  # --- Progress chip (topbar): done/total for the active pipeline ------------
+  output$progress_chip <- shiny::renderUI({
+    if (is.null(rv$omics)) return(NULL)
+    steps <- steps_for(rv$omics)
+    n <- length(steps)
+    if (!n) return(NULL)
+    done <- sum(vapply(steps, function(s) isTRUE(rv$status[[s$v]]), logical(1)))
+    shiny::div(class = "omicone-progress",
+               title = i18n("Steps completed", "已完成步骤"),
+               shiny::span(class = "omicone-progress-num",
+                           sprintf("%d/%d", done, n)),
+               shiny::div(class = "omicone-progress-bar",
+                          shiny::div(class = "omicone-progress-fill",
+                                     style = sprintf("width:%.0f%%", 100 * done / n))))
+  })
+
+  # --- Floating "next step" chip once the current step is done ---------------
+  output$next_hint <- shiny::renderUI({
+    if (is.null(rv$omics)) return(NULL)
+    cur <- input$steps
+    if (is.null(cur) || !isTRUE(rv$status[[cur]])) return(NULL)
+    steps <- steps_for(rv$omics)
+    is_done <- vapply(steps, function(s) isTRUE(rv$status[[s$v]]), logical(1))
+    if (all(is_done)) return(NULL)
+    i <- match(cur, vapply(steps, function(s) s$v, character(1)))
+    undone <- which(!is_done)
+    nxt <- undone[undone > i][1]
+    if (is.na(nxt)) nxt <- undone[1]
+    s <- steps[[nxt]]
+    shiny::tags$a(
+      class = "omicone-nextchip",
+      onclick = sprintf("Shiny.setInputValue('goto','%s',{priority:'event'})", s$v),
+      shiny::span(class = "omicone-next-label", i18n("Next step", "下一步")),
+      shiny::strong(i18n(s$en, s$zh)), "→"
+    )
+  })
+
   # --- Dataset status (bottom of sidebar), for the active omics --------------
   output$global_status <- shiny::renderUI({
     empty <- function() shiny::div(class = "omicone-status-empty",

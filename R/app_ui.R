@@ -30,6 +30,7 @@ app_ui <- function() {
       shiny::span(class = "omicone-brand",
                   shiny::strong("OmicOne"),
                   shiny::span(class = "omicone-sub", "multi-omics, locally")),
+      shiny::uiOutput("progress_chip", inline = TRUE),
       shiny::div(
         class = "omicone-topright",
         shiny::actionLink("switch_omics", i18n("← Omics", "← 切换组学"),
@@ -66,7 +67,8 @@ app_ui <- function() {
       shiny::tags$link(rel = "stylesheet", type = "text/css", href = "omicone/custom.css"),
       shiny::tags$script(src = "omicone/app.js")
     ),
-    shiny::uiOutput("main_body")
+    shiny::uiOutput("main_body"),
+    shiny::uiOutput("next_hint")
   )
 
   shiny::tagList(

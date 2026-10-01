@@ -27,6 +27,11 @@ mod_annotate_ui <- function(id) {
             each cell to a labelled reference; they are fast but need internet to
             download the reference and can be wrong for unusual tissues.",
       zh = "<b>手动</b>方式结合你的标志基因和先验知识——最可靠但需要专业经验。<b>SingleR</b> 和 <b>Azimuth</b> 会将每个细胞与带标签的参考数据集比对；它们速度快，但需要联网下载参考数据集，且对于不常见的组织可能出错。"),
+    read = list(
+      en = "Each cluster gets the reference label with the highest score. A
+            low-confidence label means no good match exists — check that
+            cluster's markers by hand before trusting the name.",
+      zh = "每个簇获得得分最高的参考标签。低置信度标签意味着没有良好匹配——采信该名称前，请手动核对这个簇的标志基因。"),
     example = list(
       en = "A cluster whose top markers are <code>CD3D</code>/<code>CD8A</code>
                would be labelled a 'CD8 T cell'. Hover a point in the plot for a
@@ -82,10 +87,16 @@ mod_annotate_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Cell-type annotation", zh = "细胞类型注释"),
+    subtitle  = list(en = "Name the clusters with reference databases.",
+                     zh = "借助参考数据库为簇命名。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("preview"))
+    preview   = preview_plot_ui(ns("preview"),
+      guide = list(en = "Annotation scores and the labelled embedding will be drawn here.",
+                   zh = "运行后，这里将绘制注释得分与标注后的嵌入图。"),
+      caption = list(en = "Clusters labelled by their best reference match.",
+                     zh = "按最佳参考匹配标注的簇。"))
   )
 }
 

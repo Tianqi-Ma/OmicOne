@@ -26,6 +26,11 @@ mod_qc_ui <- function(id) {
             the MAD multiplier to keep more cells; decrease to be stricter.",
       zh = "推荐的 <b>MAD</b> 方法会标记出相对于自身数据集的统计离群细胞（无需猜测固定数值）。
             增大 MAD 倍数可保留更多细胞；减小则更严格。"),
+    read = list(
+      en = "Violins and scatter show per-cell gene count, UMI count and
+            mitochondrial fraction; cells outside the accepted band get flagged.
+            Watch the mitochondrial tail — a long one means many dying cells.",
+      zh = "小提琴图与散点图展示每细胞的基因数、UMI 数与线粒体比例；落在接受区间外的细胞会被标记。留意线粒体比例的长尾——长尾意味着大量濒死细胞。"),
     example = list(
       en = "A cell with 40% mitochondrial reads is likely dying and gets flagged;
                a healthy cell (~5%) is kept.",
@@ -61,9 +66,15 @@ mod_qc_ui <- function(id) {
     run_button(ns("run"), "Compute & filter", "计算并过滤")
   )
   step_container(title = list(en = "Quality control", zh = "质量控制"),
+                 subtitle = list(en = "Flag and remove low-quality cells before they add noise.",
+                                 zh = "在低质量细胞引入噪声之前将其标记并去除。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "QC violins and scatter plots will be drawn here.",
+                                zh = "运行后，这里将绘制 QC 小提琴图与散点图。"),
+                   caption = list(en = "Per-cell QC metrics; flagged cells are highlighted.",
+                                  zh = "每细胞 QC 指标；被标记的细胞高亮显示。")))
 }
 
 #' @rdname mod_qc

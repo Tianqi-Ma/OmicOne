@@ -27,6 +27,11 @@ mod_embed_ui <- function(id) {
             local structure; larger values emphasize global layout. Base the
             embedding on the same reduction you clustered on.",
       zh = "默认使用 UMAP。更少的邻居数 / 更小的 min-dist 强调局部结构，更大的取值强调全局布局。降维应基于你聚类时所用的同一个线性降维结果。"),
+    read = list(
+      en = "Each point is a cell; distance approximates expression similarity.
+            Islands are populations; thin bridges between them may be doublets
+            or genuine transition states. Colours follow the current grouping.",
+      zh = "每个点是一个细胞；距离近似表达相似性。岛屿是细胞群；岛屿之间细窄的桥可能是双细胞或真实的过渡状态。颜色跟随当前分组。"),
     example = list(
       en = "Distinct cell types appear as visually separated islands on the
                UMAP.<br><b>Note:</b> PaCMAP requires a Python backend and may not
@@ -68,9 +73,15 @@ mod_embed_ui <- function(id) {
     run_button(ns("run"), "Run embedding", "运行降维")
   )
   step_container(title = list(en = "Embedding (UMAP / t-SNE)", zh = "降维可视化"),
+                 subtitle = list(en = "A 2D view of the cell neighbourhood graph.",
+                                 zh = "细胞邻域图的二维视图。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "The embedding will be drawn here.",
+                                zh = "运行后，这里将绘制降维嵌入图。"),
+                   caption = list(en = "2D embedding coloured by the active grouping.",
+                                  zh = "按当前分组着色的二维嵌入图。")))
 }
 
 #' @rdname mod_embed

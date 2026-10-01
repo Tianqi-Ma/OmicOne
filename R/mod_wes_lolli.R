@@ -62,9 +62,13 @@ mod_wes_lolli_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("plot"), download = TRUE,
-                                guide = list(en = "The chosen gene's mutation map over its protein domains will be drawn here.",
-                                             zh = "运行后，这里将绘制所选基因在蛋白结构域上的突变分布图。"))
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      preview_plot_ui(ns("plot"), download = TRUE,
+                      guide = list(en = "The chosen gene's mutation map over its protein domains will be drawn here.",
+                                   zh = "运行后，这里将绘制所选基因在蛋白结构域上的突变分布图。"),
+                      caption = list(en = "Lollipop height = samples sharing that amino-acid change; boxes = annotated protein domains.",
+                                     zh = "棒棒糖高度＝携带该氨基酸改变的样本数；方框＝已注释的蛋白结构域。")))
   )
 }
 
@@ -138,6 +142,29 @@ mod_wes_lolli_server <- function(id, rv, log_rv) {
                   if (is.na(mut) || is.na(n_samples) || !n_samples) "-"
                   else sprintf("%.1f%%", 100 * mut / n_samples))
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      c0 <- cfg()
+      if (is.null(rv$maf) || is.null(c0)) return(NULL)
+      gs <- tryCatch(as.data.frame(maftools::getGeneSummary(rv$maf)),
+                     error = function(e) NULL)
+      row <- if (!is.null(gs)) gs[gs$Hugo_Symbol == c0$gene, , drop = FALSE] else NULL
+      if (is.null(row) || !nrow(row)) return(NULL)
+      n_samples <- tryCatch(nrow(maftools::getSampleSummary(rv$maf)),
+                            error = function(e) NA_integer_)
+      mut <- if ("MutatedSamples" %in% colnames(row)) row$MutatedSamples[1] else NA_integer_
+      tot <- if ("total" %in% colnames(row)) row$total[1] else NA_integer_
+      if (is.na(mut) || is.na(n_samples) || !n_samples) return(NULL)
+      insight_bar(
+        sprintf("<b>%s</b> is mutated in <b>%s</b> of %s samples (%.1f%%; %s variants in total). Tall stacks inside a domain mark a hotspot under selection.",
+                c0$gene, format(mut, big.mark = ","), format(n_samples, big.mark = ","),
+                100 * mut / n_samples,
+                if (is.na(tot)) "?" else format(tot, big.mark = ",")),
+        sprintf("<b>%s</b> 在 %s 个样本中有 <b>%s</b> 个突变（%.1f%%；共 %s 个变异）。结构域内高耸的棒棒糖即受选择的热点。",
+                c0$gene, format(n_samples, big.mark = ","), format(mut, big.mark = ","),
+                100 * mut / n_samples,
+                if (is.na(tot)) "?" else format(tot, big.mark = ",")))
     })
 
     draw_lolli <- function() {

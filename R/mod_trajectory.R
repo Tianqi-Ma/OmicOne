@@ -30,6 +30,12 @@ mod_trajectory_ui <- function(id) {
             environment (scop::PrepareEnv). Optionally name a start cluster to
             root the trajectory.",
       zh = "<b>Slingshot</b> 是稳健的纯 R 默认方法。<b>Monocle2/3</b> 提供另一类图模型。标有 <b>*</b> 的方法（PAGA / Palantir / WOT）在 Python 中运行，需要 scop 的 conda 环境（scop::PrepareEnv）。可选地指定起始簇，以确定轨迹的根。"),
+    read = list(
+      en = "The tree or curve is the inferred trajectory; colour is pseudotime
+            measured from the chosen root. Branches are fate decisions — check
+            that the root sits in the stem-like cluster, otherwise the arrow of
+            time runs backwards.",
+      zh = "树或曲线是推断出的轨迹；颜色为从所选起点计算的拟时序。分叉即命运决定——请确认起点位于干性的簇，否则时间方向是反的。"),
     example = list(
       en = "Starting from hematopoietic stem cells, pseudotime should increase
                smoothly toward the mature myeloid and lymphoid tips.",
@@ -65,10 +71,16 @@ mod_trajectory_ui <- function(id) {
   )
   step_container(
     title     = list(en = "Trajectory / pseudotime", zh = "轨迹 / 拟时序"),
+    subtitle  = list(en = "Order cells along a differentiation path.",
+                     zh = "沿分化路径为细胞排序。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("preview"))
+    preview   = preview_plot_ui(ns("preview"),
+      guide = list(en = "The inferred trajectory and pseudotime will be drawn here.",
+                   zh = "运行后，这里将绘制推断的轨迹与拟时序。"),
+      caption = list(en = "Trajectory coloured by pseudotime from the chosen root.",
+                     zh = "按拟时序着色的轨迹（起点为所选根节点）。"))
   )
 }
 

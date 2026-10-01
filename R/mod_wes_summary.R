@@ -66,13 +66,17 @@ mod_wes_summary_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = bslib::navset_card_tab(
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      bslib::navset_card_tab(
       bslib::nav_panel(i18n("Dashboard", "仪表盘"),
                        preview_plot_ui(ns("plot"), download = TRUE,
                                        guide = list(en = "A six-panel dashboard of the cohort's mutation landscape will be drawn here.",
-                                                    zh = "运行后，这里将绘制队列突变全景的六联仪表盘。"))),
+                                                    zh = "运行后，这里将绘制队列突变全景的六联仪表盘。"),
+                                       caption = list(en = "Consequences, variant types, base changes, per-sample burden, and the most mutated genes.",
+                                                      zh = "突变后果、变异类型、碱基替换、每样本负荷与高频基因。"))),
       bslib::nav_panel(i18n("Gene frequencies", "基因频率"), shiny::uiOutput(ns("tbl_slot")))
-    )
+    ))
   )
 }
 
@@ -113,6 +117,18 @@ mod_wes_summary_server <- function(id, rv, log_rv) {
                   if (is.na(ov$top_gene)) "-"
                   else sprintf("%s (%.0f%%)", ov$top_gene, ov$top_pct))
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      if (is.null(rv$maf) || is.null(opts())) return(NULL)
+      ov <- wes_overview(rv$maf)
+      fmt <- function(x) if (is.null(x) || is.na(x)) "-" else format(round(x), big.mark = ",")
+      top <- if (is.na(ov$top_gene)) "-" else sprintf("%s (%.0f%%)", ov$top_gene, ov$top_pct)
+      insight_bar(
+        sprintf("The cohort carries <b>%s</b> variants — median <b>%s</b> per sample, led by <b>%s</b>. Samples hugging the median mean a clean cohort; outliers deserve a second look.",
+                fmt(ov$variants), fmt(ov$median_per_sample), top),
+        sprintf("该队列共 <b>%s</b> 个变异，每样本中位 <b>%s</b> 个，最高频基因为 <b>%s</b>。多数样本贴近中位数说明队列干净；离群样本值得复查。",
+                fmt(ov$variants), fmt(ov$median_per_sample), top))
     })
 
     draw_summary <- function() {

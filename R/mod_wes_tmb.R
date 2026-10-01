@@ -61,14 +61,18 @@ mod_wes_tmb_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = bslib::navset_card_tab(
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      bslib::navset_card_tab(
       bslib::nav_panel(i18n("Distribution", "分布图"),
                        preview_plot_ui(ns("plot"), download = TRUE,
                                        guide = list(en = "The per-sample TMB distribution will be drawn here.",
-                                                    zh = "运行后，这里将绘制每样本 TMB 分布图。"))),
+                                                    zh = "运行后，这里将绘制每样本 TMB 分布图。"),
+                                       caption = list(en = "Each point: one sample's non-synonymous mutations per captured megabase (log axis).",
+                                                      zh = "每个点：一个样本每捕获兆碱基的非同义突变数（对数轴）。"))),
       bslib::nav_panel(i18n("vs TCGA", "对比 TCGA"),  preview_plot_ui(ns("tcga"), download = TRUE)),
       bslib::nav_panel(i18n("Per sample", "各样本"),   shiny::uiOutput(ns("tbl_slot")))
-    )
+    ))
   )
 }
 
@@ -126,6 +130,25 @@ mod_wes_tmb_server <- function(id, rv, log_rv) {
                   if (all(is.na(v))) "-" else sprintf("%.2f", max(v, na.rm = TRUE))),
         stat_tile(i18n("Capture (Mb)", "捕获 (Mb)"), res$capture)
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      df <- res$df
+      if (is.null(df)) return(NULL)
+      cl <- tmb_col(df)
+      v <- if (!is.null(cl)) df[[cl]] else NA_real_
+      if (all(is.na(v))) return(NULL)
+      med <- stats::median(v, na.rm = TRUE)
+      cap <- if (is.na(res$capture)) "?" else format(res$capture)
+      verdict_en <- if (isTRUE(med >= 10)) "above the ~10 mut/Mb line clinics use for likely immunotherapy response"
+                    else "below the ~10 mut/Mb line clinics use for likely immunotherapy response"
+      verdict_zh <- if (isTRUE(med >= 10)) "高于临床用于预测免疫治疗响应的 ~10 mut/Mb 参考线"
+                    else "低于临床用于预测免疫治疗响应的 ~10 mut/Mb 参考线"
+      insight_bar(
+        sprintf("Median TMB <b>%.2f</b> mut/Mb (range %.2f–%.2f, capture %s Mb) — %s. The <b>vs TCGA</b> tab shows where this sits among the 33 TCGA cohorts.",
+                med, min(v, na.rm = TRUE), max(v, na.rm = TRUE), cap, verdict_en),
+        sprintf("中位 TMB <b>%.2f</b> mut/Mb（范围 %.2f–%.2f，捕获 %s Mb）——%s。<b>对比 TCGA</b> 页签可看它处于 33 个 TCGA 队列中的什么位置。",
+                med, min(v, na.rm = TRUE), max(v, na.rm = TRUE), cap, verdict_zh))
     })
 
     draw_tmb <- with_text_boost(function() {

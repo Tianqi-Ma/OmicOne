@@ -51,6 +51,11 @@ mod_cellcycle_signatures_ui <- function(id) {
             对于信号评分，勾选内置基因集，和/或按
             <code>集合名: GENE1, GENE2, ...</code>（每行一个）自定义，选择方法后点击
             <b>信号评分</b>。<b>UCell</b> 基于排名且稳健；<b>AddModuleScore</b> 为 Seurat 默认。"),
+    read = list(
+      en = "Each cell gets one score per gene set; high scores on the embedding
+            show where a programme is active. A cluster dominated by cell-cycle
+            scores is a cycling state, not a separate cell type.",
+      zh = "每个细胞对每个基因集得到一个分数；嵌入图上的高分区域即该程序活跃的位置。被周期分数主导的簇是一种增殖状态，而非独立的细胞类型。"),
     example = list(
       en = "A tumour cluster scoring high on proliferation and hypoxia while
                cycling in G2M points to an actively growing, oxygen-starved niche.",
@@ -95,9 +100,15 @@ mod_cellcycle_signatures_ui <- function(id) {
     shiny::uiOutput(ns("preview_ui"))
   )
   step_container(title = list(en = "Cell cycle & signatures", zh = "细胞周期与信号评分"),
+                 subtitle = list(en = "Score cell-cycle phase and gene-set activity per cell.",
+                                 zh = "为每个细胞评定细胞周期时相与基因集活性。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "Per-cell signature scores will be drawn here.",
+                                zh = "运行后，这里将绘制每细胞的信号评分。"),
+                   caption = list(en = "Signature / cell-cycle scores over the embedding.",
+                                  zh = "叠加在嵌入图上的信号 / 细胞周期评分。")))
 }
 
 #' @rdname mod_cellcycle_signatures

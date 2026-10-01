@@ -60,13 +60,17 @@ mod_wes_surv_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = bslib::navset_card_tab(
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      bslib::navset_card_tab(
       bslib::nav_panel(i18n("Kaplan-Meier", "生存曲线"),
                        preview_plot_ui(ns("km"), download = TRUE,
                                        guide = list(en = "The Kaplan-Meier curves will be drawn here.",
-                                                    zh = "运行后，这里将绘制 Kaplan-Meier 生存曲线。"))),
+                                                    zh = "运行后，这里将绘制 Kaplan-Meier 生存曲线。"),
+                                       caption = list(en = "Curves: fraction event-free over time; band = 95% CI; table below = patients still at risk.",
+                                                      zh = "曲线：随时间的无事件比例；阴影带＝95% CI；下表＝各时点风险人数。"))),
       bslib::nav_panel(i18n("Cohort", "队列表"), shiny::uiOutput(ns("tbl_slot")))
-    )
+    ))
   )
 }
 
@@ -243,6 +247,30 @@ mod_wes_surv_server <- function(id, rv, log_rv) {
         stat_tile(i18n("Log-rank p", "Log-rank p"),
                   if (is.null(p)) "-" else signif(p, 3))
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      d <- res$df
+      if (is.null(d)) return(NULL)
+      p <- res$lr$p
+      med <- tryCatch(km_medians(res$fit), error = function(e) NULL)
+      med_txt <- if (!is.null(med) && nrow(med)) paste(round(med$median, 1), collapse = " / ") else "?"
+      n_mut <- sum(d$.group == "Mutant", na.rm = TRUE)
+      n_wt  <- sum(d$.group == "WT", na.rm = TRUE)
+      sig_p <- !is.null(p) && is.finite(p) && p < 0.05
+      verdict_en <- if (sig_p)
+        "the separation is statistically significant — still, check the risk table for how many patients support the late part of the curves"
+      else "the separation is not statistically significant; with small groups that often means underpowered rather than equal"
+      verdict_zh <- if (sig_p)
+        "分离具有统计学显著性——但仍请看风险人数表：曲线后段还剩多少患者支撑"
+      else "分离不具统计学显著性；组小时这往往意味着效能不足，而非两组真的相同"
+      insight_bar(
+        sprintf("<b>%s</b>: %s mutant vs %s wild-type patients; median OS %s months (WT / mutant); log-rank p = %s — %s.",
+                res$label, format(n_mut, big.mark = ","), format(n_wt, big.mark = ","),
+                med_txt, if (is.null(p)) "?" else signif(p, 3), verdict_en),
+        sprintf("<b>%s</b>：突变型 %s 人 vs 野生型 %s 人；中位生存 %s 个月（野生型/突变型）；log-rank p = %s——%s。",
+                res$label, format(n_mut, big.mark = ","), format(n_wt, big.mark = ","),
+                med_txt, if (is.null(p)) "?" else signif(p, 3), verdict_zh))
     })
 
     km_gg <- function() {

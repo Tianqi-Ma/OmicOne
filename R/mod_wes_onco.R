@@ -74,9 +74,13 @@ mod_wes_onco_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("plot"), download = TRUE,
-                                guide = list(en = "The cohort's oncoplot (waterfall) will be drawn here.",
-                                             zh = "运行后，这里将绘制该队列的 Oncoplot（瀑布图）。"))
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      preview_plot_ui(ns("plot"), download = TRUE,
+                      guide = list(en = "The cohort's oncoplot (waterfall) will be drawn here.",
+                                   zh = "运行后，这里将绘制该队列的 Oncoplot（瀑布图）。"),
+                      caption = list(en = "Rows = genes, columns = samples; tile colour = mutation consequence. Top bars: per-sample burden; right bars: per-gene frequency.",
+                                     zh = "行＝基因，列＝样本；格子颜色＝突变后果。顶部柱条：每样本突变数；右侧柱条：每基因频率。")))
   )
 }
 
@@ -161,6 +165,27 @@ mod_wes_onco_server <- function(id, rv, log_rv) {
         stat_tile(i18n("Annotations", "注释列"),
                   if (length(c0$clin)) length(c0$clin) else 0)
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      c0 <- cfg()
+      if (is.null(rv$maf) || is.null(c0)) return(NULL)
+      gs <- tryCatch(as.data.frame(maftools::getGeneSummary(rv$maf)),
+                     error = function(e) NULL)
+      nsamp <- tryCatch(nrow(maftools::getSampleSummary(rv$maf)),
+                        error = function(e) NA_integer_)
+      if (is.null(gs) || !nrow(gs) || is.na(nsamp) || !nsamp) return(NULL)
+      ms <- if ("MutatedSamples" %in% colnames(gs)) gs$MutatedSamples else gs$total
+      ord <- order(ms, decreasing = TRUE)
+      gs <- gs[ord, , drop = FALSE]; ms <- ms[ord]
+      k <- min(3, nrow(gs))
+      items <- sprintf("<b>%s</b> %.0f%%", gs$Hugo_Symbol[seq_len(k)],
+                       100 * ms[seq_len(k)] / nsamp)
+      insight_bar(
+        sprintf("Top mutated: %s of samples. In the matrix, check whether they tile different columns (mutually exclusive — same pathway) or stack together (co-occurring).",
+                paste(items, collapse = ", ")),
+        sprintf("最高频基因：%s（样本占比）。在矩阵中看它们是铺满不同列（互斥——提示同一通路）还是堆在一起（共现）。",
+                paste(items, collapse = "、")))
     })
 
     draw_onco <- function() {

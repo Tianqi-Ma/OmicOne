@@ -68,14 +68,18 @@ mod_wes_sig_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = bslib::navset_card_tab(
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      bslib::navset_card_tab(
       bslib::nav_panel(i18n("Signatures", "特征谱"),
                        preview_plot_ui(ns("sig"), download = TRUE,
                                        guide = list(en = "The extracted signature fingerprints and per-sample exposures will be drawn here.",
-                                                    zh = "运行后，这里将绘制提取出的特征指纹与各样本的暴露量。"))),
+                                                    zh = "运行后，这里将绘制提取出的特征指纹与各样本的暴露量。"),
+                                       caption = list(en = "Left: signature fingerprints over 96 trinucleotide categories; right: per-sample exposure.",
+                                                      zh = "左：96 类三核苷酸特征指纹；右：每样本暴露量。"))),
       bslib::nav_panel(i18n("COSMIC match", "COSMIC 匹配"), shiny::uiOutput(ns("tbl_slot"))),
       bslib::nav_panel(i18n("APOBEC enrichment", "APOBEC 富集"), preview_plot_ui(ns("apo"), download = TRUE))
-    )
+    ))
   )
 }
 
@@ -127,6 +131,20 @@ mod_wes_sig_server <- function(id, rv, log_rv) {
         stat_tile(i18n("Genome", "基因组"), input$build),
         stat_tile(i18n("Best COSMIC match", "最佳 COSMIC 匹配"), best)
       )
+    })
+
+    output$insight <- shiny::renderUI({
+      if (is.null(res$sig)) return(NULL)
+      hits <- tryCatch({
+        txt <- paste(unlist(lapply(res$cmp$best_match, unlist)), collapse = " ")
+        h <- unique(regmatches(txt, gregexpr("SBS[0-9]+[a-z]?", txt))[[1]])
+        if (length(h)) paste(utils::head(h, 4), collapse = ", ") else "none"
+      }, error = function(e) "-")
+      insight_bar(
+        sprintf("Extracted <b>%d</b> signatures; closest COSMIC matches: <b>%s</b>. If a name is unfamiliar, compare the 96-category fingerprints themselves, not just the labels.",
+                res$n, hits),
+        sprintf("提取出 <b>%d</b> 个特征；最接近的 COSMIC 匹配：<b>%s</b>。对陌生的名称，请直接比对 96 类指纹本身，而不只是看标签。",
+                res$n, hits))
     })
 
     draw_sig <- with_text_boost(function() {

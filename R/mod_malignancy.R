@@ -30,6 +30,12 @@ mod_malignancy_ui <- function(id) {
             inferCNV and Numbat need extra setup. Stemness scores an mRNAsi-style
             gene signature you provide.",
       zh = "选择一种方法；如果可能，指定一组已知的正常参考细胞（例如免疫/基质细胞类型）。CopyKAT 无需参考；inferCNV 与 Numbat 需要额外配置。干性打分基于你提供的 mRNAsi 风格基因特征。"),
+    read = list(
+      en = "The heatmap shows chromosome-scale gains (warm colours) and losses
+            (cool) per cell; the score ranks each cell's malignancy. The
+            reference cells anchor what 'normal' looks like — tumour cells are
+            the ones that depart from it.",
+      zh = "热图展示每个细胞染色体尺度的扩增（暖色）与缺失（冷色）；评分给出每个细胞的恶性程度。参考细胞锚定了「正常」的基线——偏离它的即肿瘤细胞。"),
     example = list(
       en = "Epithelial cells flagged <b>aneuploid</b> are likely the tumour;
                matched <b>diploid</b> T/B cells act as the normal reference.",
@@ -66,9 +72,15 @@ mod_malignancy_ui <- function(id) {
     run_button(ns("run_stem"), "Score stemness", "计算干性评分")
   )
   step_container(title = list(en = "Malignant cells / CNV", zh = "恶性细胞 / CNV"),
+                 subtitle = list(en = "Separate malignant cells by CNV-like signal.",
+                                 zh = "按 CNV 样信号区分恶性细胞。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "The CNV-style heatmap and malignancy scores will be drawn here.",
+                                zh = "运行后，这里将绘制 CNV 热图与恶性评分。"),
+                   caption = list(en = "Chromosome-scale gain/loss heatmap per cell.",
+                                  zh = "每细胞染色体尺度扩增/缺失热图。")))
 }
 
 #' @rdname mod_malignancy

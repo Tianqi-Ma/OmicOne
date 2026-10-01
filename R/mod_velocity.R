@@ -29,6 +29,11 @@ mod_velocity_ui <- function(id) {
             (run scop::PrepareEnv() once). The <b>dynamical</b> mode is most
             accurate; <b>stochastic</b> / <b>deterministic</b> are faster.",
       zh = "对象中需要包含<b>剪接 / 未剪接图层</b>（来自 velocyto 或 kallisto|bustools），并需要 <b>Python conda 环境</b>（首次使用请运行 scop::PrepareEnv()）。<b>dynamical</b> 模式最准确；<b>stochastic</b> / <b>deterministic</b> 更快。"),
+    read = list(
+      en = "Arrows point from a cell's current state toward its likely future
+            state. Long, coherent arrows mean a strong directional flow; short,
+            random ones mean the signal is weak in that region.",
+      zh = "箭头从细胞当前状态指向其可能的未来状态。长而一致的箭头＝强的定向流；短而杂乱的箭头＝该区域信号弱。"),
     example = list(
       en = "In a differentiating system, velocity arrows should flow from
                progenitor cells outward toward the mature cell types.",
@@ -56,10 +61,16 @@ mod_velocity_ui <- function(id) {
   )
   step_container(
     title     = list(en = "RNA velocity", zh = "RNA 速率"),
+    subtitle  = list(en = "Each cell's future direction from splicing kinetics.",
+                     zh = "基于剪接动力学推断每个细胞的未来方向。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("preview"))
+    preview   = preview_plot_ui(ns("preview"),
+      guide = list(en = "The velocity field will be drawn here.",
+                   zh = "运行后，这里将绘制速率场。"),
+      caption = list(en = "RNA velocity field over the embedding.",
+                     zh = "叠加在嵌入图上的 RNA 速率场。"))
   )
 }
 

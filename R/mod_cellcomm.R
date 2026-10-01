@@ -34,6 +34,11 @@ mod_cellcomm_ui <- function(id) {
       zh = "选择标注细胞群体的元数据列（通常是细胞类型或簇），再选择方法。
             <b>LIANA</b> 聚合多种打分方法，是稳健的 R 默认；<b>CellChat</b> 提供通路级视图。
             标 <b>*</b> 的方法（CellPhoneDB、NicheNet）需要额外设置（通常是 Python）。"),
+    read = list(
+      en = "Circles are cell types, edges are significant ligand–receptor
+            pairs; a thicker edge means stronger communication. Look for the
+            sender→receiver pairs that could explain a behaviour you see.",
+      zh = "圆圈为细胞类型，连线为显著的配体–受体对；线越粗通讯越强。寻找能解释你所观察现象的发送→接收对。"),
     example = list(
       en = "Macrophages signalling to T cells via a checkpoint ligand-receptor
                pair would appear as a strong edge between those two groups.",
@@ -59,9 +64,15 @@ mod_cellcomm_ui <- function(id) {
     run_button(ns("run"), "Infer communication", "推断通讯")
   )
   step_container(title = list(en = "Cell-cell communication", zh = "细胞间通讯"),
+                 subtitle = list(en = "Ligand–receptor conversations between cell types.",
+                                 zh = "细胞类型之间的配体–受体对话。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview")))
+                 preview = preview_plot_ui(ns("preview"),
+                   guide = list(en = "The inferred communication network will be drawn here.",
+                                zh = "运行后，这里将绘制推断的通讯网络。"),
+                   caption = list(en = "Cell-cell communication network (edge width = strength).",
+                                  zh = "细胞间通讯网络（连线粗细＝强度）。")))
 }
 
 #' @rdname mod_cellcomm
