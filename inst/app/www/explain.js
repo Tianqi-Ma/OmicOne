@@ -58,10 +58,13 @@
     for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
     return h >>> 0;
   }
-  // "#rrggbb" or "rgb(r,g,b)" (mix() returns the latter, and mixes get mixed again)
+  // "#rrggbb", "#rgb" or "rgb(r,g,b)" (mix() returns the latter, and mixes get mixed again)
   function hexRgb(c) {
+    c = String(c).trim();
     var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c);
     if (m) return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+    m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c);    // short form, e.g. a theme's #fff
+    if (m) return [parseInt(m[1] + m[1], 16), parseInt(m[2] + m[2], 16), parseInt(m[3] + m[3], 16)];
     m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(c);
     if (m) return [+m[1], +m[2], +m[3]];
     return [128, 128, 128];
