@@ -257,7 +257,8 @@ test_that("km_plot draws bands, a risk table and the HR without failing", {
   p <- km_plot(fit, logrank_test(d), "Overall survival", hr = cox_hr(d), note = "test")
   f <- tempfile(fileext = ".pdf")
   grDevices::pdf(f)
-  expect_no_error(print(p))
+  expect_no_error(draw_plot_object(p))
+  expect_s3_class(p, "omicone_grid")                # the risk table is composed under the curves
   grDevices::dev.off()
   expect_equal(levels(km_tidy(fit)$group), c("Low", "High"))
   expect_equal(format_median(c(NA, 12.345)), c("NR", "12.3"))

@@ -113,7 +113,7 @@ mod_import_ui <- function(id) {
   tbl_out <- function(id) {
     if (has_pkg("DT")) DT::dataTableOutput(id) else shiny::verbatimTextOutput(id)
   }
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Import & inspect", zh = "导入与检查"),
     subtitle  = list(en = "Load counts or a Seurat object and inspect the overview.",
                      zh = "载入计数或 Seurat 对象，并查看数据总览。"),

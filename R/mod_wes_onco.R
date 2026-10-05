@@ -70,7 +70,7 @@ mod_wes_onco_ui <- function(id) {
                          i18n("Show mutation percentages", "显示突变百分比"), value = TRUE),
     run_button(ns("run"), "Draw oncoplot", "绘制 Oncoplot")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Oncoplot", zh = "Oncoplot"),
     subtitle  = list(en = "Gene × sample mutation matrix — the waterfall figure.",
                      zh = "基因 × 样本突变矩阵——瀑布图。"),
@@ -110,18 +110,8 @@ mod_wes_onco_server <- function(id, rv, log_rv) {
     })
 
     draw_with <- function(maf, c0) {
-      n_genes <- length(c0$shown)
-      args <- list(maf = maf, draw_titv = c0$titv, showTumorSampleBarcodes = FALSE,
-                   removeNonMutated = TRUE,
-                   fontSize = adaptive_cex(n_genes, base = 1.0, n_ref = 20,
-                                           lo = 0.7, hi = 1.15))
-      if (is.null(c0$genes)) args$top <- c0$top else args$genes <- c0$genes
-      if (length(c0$clin)) {
-        args$clinicalFeatures <- c0$clin
-        if (c0$sort_anno) args$sortByAnnotation <- TRUE
-      }
-      if (!c0$pct) args$showPct <- FALSE
-      do.call(maftools::oncoplot, args)
+      wes_oncoplot_gg(maf, c0$shown, clin = c0$clin, sort_anno = c0$sort_anno,
+                      show_pct = c0$pct, titv = c0$titv)
     }
 
     shiny::observeEvent(input$run, {
@@ -153,7 +143,7 @@ mod_wes_onco_server <- function(id, rv, log_rv) {
                  sort_anno = isTRUE(input$sort_anno),
                  titv = isTRUE(input$draw_titv),
                  pct = isTRUE(input$show_pct))
-      ok <- with_progress_notify(wes_dry_run(function() draw_with(maf, c0)),
+      ok <- with_progress_notify(wes_dry_run(function() draw_plot_object(draw_with(maf, c0))),
                                  message = "Drawing the oncoplot...")
       if (is.null(ok)) return(NULL)
       cfg(c0)
@@ -211,9 +201,7 @@ mod_wes_onco_server <- function(id, rv, log_rv) {
       shiny::req(rv$maf, c0)
       draw_with(rv$maf, c0)
     }
-    output$plot <- render_base_plot(draw_onco)
-    register_figure_download(
-      output, input, "plot", draw_onco, "wes_oncoplot",
+    render_step_plot(output, input, "plot", draw_onco, name = "wes_oncoplot",
       width = function() {
         n <- tryCatch(nrow(maftools::getSampleSummary(rv$maf)), error = function(e) 50)
         max(10, min(30, 4 + 0.09 * n))
@@ -221,7 +209,7 @@ mod_wes_onco_server <- function(id, rv, log_rv) {
       height = function() {
         c0 <- cfg()
         n <- if (is.null(c0)) 20 else length(c0$shown)
-        max(7, min(20, 3 + 0.28 * n))
+        max(7, min(20, 3.5 + 0.28 * n + 0.3 * length(c0$clin %||% character(0))))
       })
   })
 }

@@ -45,7 +45,7 @@ mod_abundance_ui <- function(id) {
     sample_design_controls(ns, levels = FALSE),
     run_button(ns("run"), "Test abundance", "检验细胞组成")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Differential abundance", zh = "细胞组成差异"),
     subtitle  = list(en = "Do cell-type proportions differ between conditions?",
                      zh = "细胞类型的比例在条件之间是否不同？"),
@@ -149,13 +149,15 @@ mod_abundance_server <- function(id, rv, log_rv) {
     render_step_plot(output, input, "preview", function() {
       df <- res$df
       shiny::req(df)
-      abundance_plot(df)
+      d <- res$design
+      abundance_plot(df, cond_colors = if (d$condition %in% obj_meta_cols(rv$obj)) group_colors(rv$obj, d$condition))
     }, name = "abundance_proportions", width = 11, height = 7)
 
     render_step_plot(output, input, "stack", function() {
       df <- res$df
       shiny::req(df)
-      abundance_stack_plot(df)
+      d <- res$design
+      abundance_stack_plot(df, group_colors = if (d$group %in% obj_meta_cols(rv$obj)) group_colors(rv$obj, d$group))
     }, name = "abundance_composition", width = 11, height = 6)
 
     output$tbl <- render_tbl_wrap(function() {

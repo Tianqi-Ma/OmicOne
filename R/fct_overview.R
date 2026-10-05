@@ -69,7 +69,7 @@ overview_plots <- function(obj, species = guess_species(obj), when = "at import"
                                                 fill = .data$metric)) +
       ggplot2::geom_violin(scale = "width", trim = TRUE, alpha = 0.85) +
       ggplot2::facet_wrap(~metric, scales = "free", nrow = 1) +
-      ggplot2::scale_fill_manual(values = sc_palette(length(metrics)), guide = "none") +
+      ggplot2::scale_fill_manual(values = rep(style_tokens()$kept, length(metrics)), guide = "none") +
       ggplot2::labs(x = NULL, y = NULL,
                     title = sprintf("Per-cell QC metrics (%s, %s cells)", when,
                                     format(nrow(md), big.mark = ","))) +
@@ -86,7 +86,7 @@ overview_plots <- function(obj, species = guess_species(obj), when = "at import"
     dtop <- data.frame(gene = factor(names(frac), levels = rev(names(frac))),
                        frac = as.numeric(frac) * 100)
     p_top <- ggplot2::ggplot(dtop, ggplot2::aes(x = .data$gene, y = .data$frac)) +
-      ggplot2::geom_col(fill = sc_palette(1)) +
+      ggplot2::geom_col(fill = style_tokens()$kept, width = 0.75) +
       ggplot2::coord_flip() +
       ggplot2::labs(x = NULL, y = "% of total counts", title = "Top expressed genes") +
       omicone_theme()
@@ -96,7 +96,7 @@ overview_plots <- function(obj, species = guess_species(obj), when = "at import"
   p_sc <- NULL
   if (all(c("nCount_RNA", "nFeature_RNA") %in% colnames(md))) {
     p_sc <- ggplot2::ggplot(md, ggplot2::aes(x = .data$nCount_RNA, y = .data$nFeature_RNA)) +
-      ggplot2::geom_point(size = 0.5, alpha = 0.4, colour = sc_palette(1)) +
+      ggplot2::geom_point(size = 0.5, alpha = 0.4, colour = style_tokens()$kept, stroke = 0, shape = 16) +
       ggplot2::scale_x_log10() +
       ggplot2::labs(x = "UMIs / cell (log10)", y = "Genes / cell",
                     title = "Counts vs genes") +
@@ -105,8 +105,8 @@ overview_plots <- function(obj, species = guess_species(obj), when = "at import"
 
   plots <- Filter(Negate(is.null), list(p_vln, p_top, p_sc))
   if (!length(plots)) stop("Nothing to plot: no QC metrics or counts available.")
-  if (patchwork_ok() && length(plots) > 1) {
-    patchwork::wrap_plots(plots, ncol = 1)
+  if (length(plots) > 1) {
+    compose_grid(plots, nrow = length(plots), ncol = 1)
   } else {
     plots[[1]]
   }

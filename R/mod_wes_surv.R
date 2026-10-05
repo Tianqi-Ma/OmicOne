@@ -69,7 +69,7 @@ mod_wes_surv_ui <- function(id) {
     shiny::uiOutput(ns("options_ui")),
     run_button(ns("run"), "Run survival analysis", "运行生存分析")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Mutation vs survival", zh = "突变与预后"),
     subtitle  = list(en = "Kaplan-Meier curves, log-rank test and Cox HR for mutant versus wild-type.",
                      zh = "突变型与野生型的 Kaplan-Meier 曲线、log-rank 检验与 Cox 风险比。"),

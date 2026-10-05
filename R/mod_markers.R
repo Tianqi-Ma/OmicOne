@@ -78,7 +78,7 @@ mod_markers_ui <- function(id) {
     shiny::numericInput(ns("top_n"), NULL, value = 5, min = 1, max = 50, step = 1),
     run_button(ns("run"), "Find markers", "查找标志基因")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Marker genes", zh = "标志基因"),
     subtitle  = list(en = "Find the genes that define each cluster.",
                      zh = "找出定义每个簇的基因。"),
@@ -229,7 +229,7 @@ mod_markers_server <- function(id, rv, log_rv) {
     render_step_plot(output, input, "bars", function() {
       top <- top_markers()
       shiny::req(nrow(top) > 0)
-      markers_bar_plot(top)
+      markers_bar_plot(top, colors = if (res$group_by %in% obj_meta_cols(rv$obj)) group_colors(rv$obj, res$group_by))
     }, name = "markers_bars", width = 12, height = 9)
 
     output$tbl <- render_tbl_wrap(function() {

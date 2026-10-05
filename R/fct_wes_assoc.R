@@ -172,11 +172,11 @@ wes_tmb_resp_plot <- function(d, res, positive) {
   d$group <- factor(ifelse(d$.resp == 1, positive, "other"), levels = c("other", positive))
   floor <- 0.5 / attr(d, "flow")$capture
   ggplot2::ggplot(d, ggplot2::aes(x = .data$group, y = pmax(.data$tmb, floor))) +
-    ggplot2::geom_boxplot(outlier.shape = NA, width = 0.5, colour = "#9aa5b1") +
+    ggplot2::geom_boxplot(outlier.shape = NA, width = 0.5, colour = style_tokens()$faint) +
     ggplot2::geom_point(ggplot2::aes(colour = .data$group),
                         position = ggplot2::position_jitter(width = 0.13, height = 0, seed = 1), size = 1.8, alpha = 0.8) +
     ggplot2::scale_y_log10() +
-    ggplot2::scale_colour_manual(values = c("#9aa5b1", "#2f81c7"), guide = "none") +
+    ggplot2::scale_colour_manual(values = c(style_tokens()$faint, style_tokens()$accent), guide = "none") +
     ggplot2::labs(x = NULL, y = "TMB (mut/Mb, log; TMB 0 drawn at the floor)",
                   subtitle = sprintf("Wilcoxon rank-sum p = %s; OR per doubling %.2f (%.2f-%.2f)",
                                      format(signif(res$wilcox_p, 3)), res$or, res$lower, res$upper)) +
@@ -187,8 +187,8 @@ wes_tmb_resp_plot <- function(d, res, positive) {
 #' @keywords internal
 wes_tmb_roc_plot <- function(res) {
   ggplot2::ggplot(res$roc, ggplot2::aes(x = .data$fpr, y = .data$tpr)) +
-    ggplot2::geom_abline(slope = 1, intercept = 0, linetype = 2, colour = "#9aa5b1") +
-    ggplot2::geom_step(colour = "#2f81c7", linewidth = 1, direction = "vh") +
+    ggplot2::geom_abline(slope = 1, intercept = 0, linetype = 2, colour = style_tokens()$faint) +
+    ggplot2::geom_step(colour = style_tokens()$accent, linewidth = 1, direction = "vh") +
     ggplot2::coord_equal() +
     ggplot2::labs(x = "1 - specificity", y = "sensitivity",
                   subtitle = sprintf("AUC %.2f (95%% CI %.2f-%.2f, %s); %d responders, %d others",

@@ -647,3 +647,76 @@ test_that("the filter, TMB-outcome and report modules run end to end", {
       expect_silent(parse(text = txt))
     })))
 })
+
+# ---- figures (fct_wes_plots.R): ggplot2, no maftools base graphics -------------
+
+test_that("every WES figure draws on TCGA-LAML in the shared style", {
+  skip_if_not_installed("maftools")
+  d <- laml()
+  draw_ok <- function(p) {
+    f <- tempfile(fileext = ".pdf")
+    grDevices::pdf(f, width = 12, height = 8)
+    on.exit(grDevices::dev.off(), add = TRUE)
+    draw_plot_object(p)
+    TRUE
+  }
+  genes <- utils::head(wes_genes(d$maf), 15)
+  expect_true(draw_ok(wes_summary_gg(d$maf)))
+  expect_true(draw_ok(wes_oncoplot_gg(d$maf, genes, clin = "FAB_classification", titv = TRUE)))
+  expect_true(draw_ok(wes_titv_gg(wes_titv(d$maf))))
+  expect_true(draw_ok(wes_vaf_gg(d$maf, "i_TumorVAF_WU")))
+  expect_true(draw_ok(wes_rainfall_gg(d$maf, "TCGA-AB-2972")))
+  expect_true(draw_ok(wes_tcga_gg(d$maf, 35.8, "LAML-in")))
+  rp <- wes_recurrent_positions(d$maf, "DNMT3A", "Protein_Change")
+  expect_true(draw_ok(wes_lollipop_gg(d$maf, "DNMT3A", "Protein_Change", label_at = rp$positions)))
+  expect_true(draw_ok(wes_oncodrive_gg(wes_oncodrive(d$maf, "Protein_Change")$res)))
+  int <- wes_interactions(d$maf, 12)
+  expect_true(draw_ok(wes_interactions_gg(int, utils::head(wes_genes(d$maf), 12))))
+  het <- suppressMessages(maftools::inferHeterogeneity(d$maf, tsb = "TCGA-AB-2972", vafCol = "i_TumorVAF_WU"))
+  expect_true(draw_ok(wes_hetero_gg(het, "TCGA-AB-2972")))
+  expect_error(wes_lollipop_gg(d$maf, "NOTAGENE", "Protein_Change"), "no non-synonymous")
+})
+
+test_that("the oncoplot is waterfall-sorted and its shares are out of every sample", {
+  skip_if_not_installed("maftools")
+  d <- laml()
+  g <- wes_oncoplot_gg(d$maf, c("FLT3", "NPM1"))
+  expect_s3_class(g, "omicone_grid")
+  cells <- wes_mut_cells(wes_records(d$maf), c("FLT3", "NPM1"))
+  # a sample with two classes in one gene is one Multi_Hit cell
+  expect_false(any(duplicated(paste(cells$sample, cells$gene))))
+  flt3 <- unique(cells$sample[cells$gene == "FLT3"])
+  expect_equal(length(flt3), 52)                             # 52 of 193 = 27%, as maftools reports
+})
+
+test_that("the interaction heatmap colours co-occurrence red and exclusivity blue", {
+  skip_if_not_installed("maftools")
+  d <- laml()
+  int <- wes_interactions(d$maf, 10)
+  p <- wes_interactions_gg(int, utils::head(wes_genes(d$maf), 10))
+  dd <- p$data
+  expect_true(all(dd$score[dd$Event == "Co_Occurence"] >= 0))
+  expect_true(all(dd$score[dd$Event == "Mutually_Exclusive"] <= 0))
+})
+
+test_that("signature, exposure and rank figures draw from NMF-shaped results", {
+  skip_if_not_installed("maftools")
+  db <- readRDS(system.file("extdata", "SBS_signatures.RDs", package = "maftools"))
+  W <- as.matrix(db$db[, c("SBS1", "SBS4")])
+  rownames(W) <- rownames(db$db)
+  colnames(W) <- c("Signature_1", "Signature_2")
+  H <- matrix(stats::rgamma(40, 2), 2, dimnames = list(colnames(W), paste0("S", 1:20)))
+  sig <- list(signatures = W, contributions = H)
+  draw_ok <- function(p) {
+    f <- tempfile(fileext = ".pdf")
+    grDevices::pdf(f)
+    on.exit(grDevices::dev.off(), add = TRUE)
+    draw_plot_object(p)
+    TRUE
+  }
+  expect_true(draw_ok(wes_signatures_gg(sig)))
+  expect_true(draw_ok(wes_exposures_gg(sig)))
+  expect_true(draw_ok(wes_cophenetic_gg(list(nmfSummary = data.frame(rank = 2:5, cophenetic = c(.99, .95, .8, .7))), 3)))
+  parts <- wes_sbs96_parts(rownames(W))
+  expect_setequal(unique(parts$cls), names(wes_sbs_colors()))
+})

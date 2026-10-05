@@ -122,7 +122,7 @@ mod_report_ui <- function(id, omics = "sc") {
       shiny::downloadButton(ns("download_script"),
                             i18n("Download R script", "下载 R 脚本"), class = "w-100 btn-outline-secondary"))
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Export report", zh = "导出报告"),
     explainer = explainer,
     controls  = controls,

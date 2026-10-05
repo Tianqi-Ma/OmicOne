@@ -59,7 +59,7 @@ mod_wes_tmbclin_ui <- function(id) {
                               "临床表中无 MAF 记录的样本已测序：TMB = 0"), value = TRUE),
     run_button(ns("run"), "Test TMB association", "检验 TMB 关联")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "TMB vs outcome", zh = "TMB 与临床结局"),
     subtitle  = list(en = "Survival or response per doubling of TMB, with no cut-off to choose.",
                      zh = "以 TMB 每翻一倍衡量与生存或疗效的关联，无需选择阈值。"),

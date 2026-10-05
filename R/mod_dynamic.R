@@ -52,7 +52,7 @@ mod_dynamic_ui <- function(id) {
     shiny::numericInput(ns("n_candidates"), NULL, value = 1000, min = 50, max = 5000, step = 50),
     run_button(ns("run"), "Detect dynamic features", "检测动态特征")
   )
-  step_container(title = list(en = "Dynamic features", zh = "动态特征"),
+  step_container(id = id, title = list(en = "Dynamic features", zh = "动态特征"),
                  subtitle = list(en = "Genes that switch on or off along a trajectory.",
                                  zh = "沿轨迹开启或关闭的基因。"),
                  explainer = explainer, controls = controls,

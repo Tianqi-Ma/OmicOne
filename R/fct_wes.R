@@ -802,7 +802,7 @@ wes_tmb_plot <- function(df, capture, log_scale = TRUE, ref = 10) {
   d$y <- if (isTRUE(log_scale)) ifelse(d$total == 0, floor_y, d$total_perMB) else d$total_perMB
   med <- stats::median(d$total_perMB)
   p <- ggplot2::ggplot(d, ggplot2::aes(x = .data$rank, y = .data$y, shape = .data$kind)) +
-    ggplot2::geom_point(colour = "#3b6ea5", alpha = 0.65, size = 1.9) +
+    ggplot2::geom_point(colour = style_tokens()$kept, alpha = 0.65, size = 1.9) +
     ggplot2::scale_shape_manual(values = c(">= 1 mutation" = 16, "0 mutations" = 2),
                                 name = NULL) +
     ggplot2::geom_hline(yintercept = ref, linetype = 3, colour = "#8b98a5") +
@@ -815,7 +815,7 @@ wes_tmb_plot <- function(df, capture, log_scale = TRUE, ref = 10) {
                   title = sprintf("Tumour mutational burden — median %.2f mut/Mb", med)) +
     omicone_theme()
   if (med > 0 || !isTRUE(log_scale)) {
-    p <- p + ggplot2::geom_hline(yintercept = med, linetype = 2, colour = "#c1476b")
+    p <- p + ggplot2::geom_hline(yintercept = med, linetype = 2, colour = style_tokens()$removed)
   }
   if (isTRUE(log_scale)) p <- p + ggplot2::scale_y_log10()
   p
@@ -1350,8 +1350,8 @@ wes_forest_plot <- function(fd, l1, l2, n1, n2, q) {
   ggplot2::ggplot(fd, ggplot2::aes(x = .data$or_plot, y = .data$label)) +
     ggplot2::geom_vline(xintercept = 1, linetype = 2, colour = "#8b98a5") +
     ggplot2::geom_errorbar(ggplot2::aes(xmin = .data$lo_plot, xmax = .data$hi_plot),
-                           width = 0.25, orientation = "y", colour = "#3b6ea5") +
-    ggplot2::geom_point(ggplot2::aes(shape = .data$kind), size = 2.6, colour = "#3b6ea5") +
+                           width = 0.25, orientation = "y", colour = style_tokens()$kept) +
+    ggplot2::geom_point(ggplot2::aes(shape = .data$kind), size = 2.6, colour = style_tokens()$kept) +
     ggplot2::scale_shape_manual(values = c("Fisher estimate" = 16,
                                            "zero cell: +1 pseudo-count (display only)" = 1),
                                 name = NULL) +

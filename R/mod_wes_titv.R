@@ -65,7 +65,7 @@ mod_wes_titv_ui <- function(id) {
                          value = TRUE),
     run_button(ns("run"), "Draw spectra", "绘制图谱")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "TiTv / VAF / rainfall", zh = "TiTv / VAF / rainfall"),
     subtitle  = list(en = "Three spectra: base-change balance, allele fractions, genome-wide spacing.",
                      zh = "三种图谱：碱基替换平衡、等位基因频率、全基因组间距。"),
@@ -206,33 +206,25 @@ mod_wes_titv_server <- function(id, rv, log_rv) {
                 wes_fmt(n_snv), ct, ca, lead_zh))
     })
 
-    draw_titv <- with_text_boost(function() {
+    draw_titv <- function() {
       shiny::req(res$titv)
-      maftools::plotTiTv(res = res$titv)
-    })
-    output$titv <- render_base_plot(draw_titv)
-    register_figure_download(output, input, "titv", draw_titv, "wes_titv",
-                             width = 9, height = 6)
+      wes_titv_gg(res$titv)
+    }
+    render_step_plot(output, input, "titv", draw_titv, name = "wes_titv", width = 11, height = 8)
 
-    draw_vaf <- with_text_boost(function() {
+    draw_vaf <- function() {
       shiny::req(rv$maf, res$cfg)
       if (!isTRUE(res$cfg$vaf_ok)) {
         stop("No allele fractions: pick a VAF column, or provide t_ref_count / t_alt_count in the MAF.")
       }
-      maftools::plotVaf(maf = rv$maf, vafCol = res$cfg$vaf)
-    })
-    output$vaf <- render_base_plot(draw_vaf)
-    register_figure_download(output, input, "vaf", draw_vaf, "wes_vaf",
-                             width = 10, height = 7)
+      wes_vaf_gg(rv$maf, vaf_col = res$cfg$vaf)
+    }
+    render_step_plot(output, input, "vaf", draw_vaf, name = "wes_vaf", width = 10, height = 6.5)
 
-    draw_rain <- with_text_boost(function() {
+    draw_rain <- function() {
       shiny::req(rv$maf, res$cfg, res$cfg$tsb)
-      maftools::rainfallPlot(maf = rv$maf, tsb = res$cfg$tsb,
-                             detectChangePoints = res$cfg$cp,
-                             ref.build = res$cfg$build, pointSize = 0.6)
-    })
-    output$rain <- render_base_plot(draw_rain)
-    register_figure_download(output, input, "rain", draw_rain, "wes_rainfall",
-                             width = 12, height = 6)
+      wes_rainfall_gg(rv$maf, res$cfg$tsb, build = res$cfg$build, changepoints = res$cfg$cp)
+    }
+    render_step_plot(output, input, "rain", draw_rain, name = "wes_rainfall", width = 12, height = 5.5)
   })
 }

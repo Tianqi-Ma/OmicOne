@@ -58,7 +58,7 @@ mod_velocity_ui <- function(id) {
     shiny::selectInput(ns("group_by"), NULL, choices = NULL),
     run_button(ns("run"), "Run velocity", "运行 RNA 速率")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "RNA velocity", zh = "RNA 速率"),
     subtitle  = list(en = "Each cell's future direction from splicing kinetics.",
                      zh = "基于剪接动力学推断每个细胞的未来方向。"),

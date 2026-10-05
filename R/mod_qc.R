@@ -83,7 +83,7 @@ mod_qc_ui <- function(id) {
     ),
     run_button(ns("run"), "Compute & filter", "计算并过滤")
   )
-  step_container(title = list(en = "Quality control", zh = "质量控制"),
+  step_container(id = id, title = list(en = "Quality control", zh = "质量控制"),
                  subtitle = list(en = "Flag and remove low-quality cells before they add noise.",
                                  zh = "在低质量细胞引入噪声之前将其标记并去除。"),
                  explainer = explainer, controls = controls,

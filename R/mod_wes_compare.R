@@ -62,7 +62,7 @@ mod_wes_compare_ui <- function(id) {
     shiny::numericInput(ns("fdr"), NULL, value = 0.1, min = 0.001, max = 0.25, step = 0.01),
     run_button(ns("run"), "Compare cohorts", "比较队列")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Cohort comparison", zh = "队列比较"),
     subtitle  = list(en = "Fisher tests (BH-adjusted) for genes that differ between two groups.",
                      zh = "用 Fisher 检验（BH 校正）找出两组间突变比例不同的基因。"),
@@ -233,7 +233,7 @@ mod_wes_compare_server <- function(id, rv, log_rv) {
     render_step_plot(output, input, "forest", forest_gg, name = "wes_forest",
                      width = 9, height = function() max(4, 2 + 0.35 * stats()$sig))
 
-    draw_cobar <- with_text_boost(function() {
+    draw_cobar <- function() {
       c0 <- res$cmp
       shiny::req(c0)
       s <- stats()
@@ -241,12 +241,10 @@ mod_wes_compare_server <- function(id, rv, log_rv) {
         stop(sprintf("No gene passes FDR < %g, so there is nothing to compare side by side. The Results tab lists every tested gene.",
                      res$fdr))
       }
-      maftools::coBarplot(m1 = c0$m1, m2 = c0$m2, m1Name = res$l1, m2Name = res$l2,
-                          genes = s$genes)
-    })
-    output$cobar <- render_base_plot(draw_cobar)
-    register_figure_download(output, input, "cobar", draw_cobar,
-                             "wes_cobarplot", width = 10, height = 8)
+      wes_cobar_gg(c0$m1, c0$m2, res$l1, res$l2, s$genes)
+    }
+    render_step_plot(output, input, "cobar", draw_cobar, name = "wes_cobarplot", width = 10,
+                     height = function() max(4.5, 2.2 + 0.4 * length(stats()$genes)))
 
     view <- shiny::reactive({
       shiny::req(res$cmp)

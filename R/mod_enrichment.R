@@ -78,7 +78,7 @@ mod_enrichment_ui <- function(id) {
       shiny::numericInput(ns("lfc"), NULL, value = 0.25, min = 0, max = 5, step = 0.05)),
     run_button(ns("run"), "Run enrichment", "运行富集分析")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Enrichment & GSEA", zh = "富集与 GSEA"),
     subtitle  = list(en = "Pathways and gene sets behind each group's DE genes.",
                      zh = "每个分组差异基因背后的通路与基因集。"),

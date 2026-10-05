@@ -82,7 +82,7 @@ mod_clinical_ui <- function(id) {
     run_button(ns("run"), "Run survival analysis", "运行生存分析")
   )
 
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Clinical data & survival", zh = "临床数据与生存分析"),
     subtitle  = list(en = "Patient-level survival: one value per patient, then compare outcome.",
                      zh = "患者层面的生存分析：每位患者一个数值，再比较预后。"),

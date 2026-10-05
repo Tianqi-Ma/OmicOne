@@ -72,7 +72,7 @@ mod_cluster_ui <- function(id) {
     run_button(ns("run"), "Run clustering", "运行聚类"),
     shiny::uiOutput(ns("active_ui"))
   )
-  step_container(title = list(en = "Clustering", zh = "聚类"),
+  step_container(id = id, title = list(en = "Clustering", zh = "聚类"),
                  subtitle = list(en = "Group cells by expression similarity, then pick the active resolution.",
                                  zh = "按表达相似性对细胞分群，再选定当前分辨率。"),
                  explainer = explainer, controls = controls,

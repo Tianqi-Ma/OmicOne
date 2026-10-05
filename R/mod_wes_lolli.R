@@ -57,7 +57,7 @@ mod_wes_lolli_ui <- function(id) {
                               "标注复发位点（出现 ≥ 2 次）"), value = TRUE),
     run_button(ns("run"), "Draw lollipop", "绘制 Lollipop")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Lollipop / domains", zh = "Lollipop / 结构域"),
     subtitle  = list(en = "Where on the protein the mutations land.",
                      zh = "突变落在蛋白的哪个位置。"),
@@ -123,25 +123,8 @@ mod_wes_lolli_server <- function(id, rv, log_rv) {
     }
 
     draw_with <- function(maf, c0) {
-      # Adaptive fonts: scale label/legend text by how many positions are
-      # labelled, repel labels, and rotate them vertical when the labelled
-      # positions are densely packed along the protein.
-      n_lab <- max(1, length(c0$label_at))
-      span <- if (length(c0$label_at) >= 2) diff(range(c0$label_at)) + 1 else Inf
-      dense <- length(c0$label_at) >= 12 && (length(c0$label_at) / span) > 0.04
-      fs <- adaptive_cex(n_lab, n_ref = 14, lo = 0.75, hi = 1.45)
-      args <- list(maf = maf, gene = c0$gene, showMutationRate = c0$rate,
-                   repel = TRUE,
-                   labPosSize = round(fs, 2),
-                   legendTxtSize = round(max(0.95, min(1.15, fs)), 2),
-                   axisTextSize = rep(round(max(1.0, min(1.25, fs)), 2), 2),
-                   domainLabelSize = round(max(0.85, min(1.0, fs)), 2),
-                   titleSize = c(1.15, 1.0))
-      if (dense) args$labPosAngle <- 90
-      if (!is.null(c0$aa)) args$AACol <- c0$aa
-      if (!is.null(c0$tx)) args$refSeqID <- c0$tx
-      if (length(c0$label_at)) args$labelPos <- c0$label_at
-      do.call(maftools::lollipopPlot, args)
+      wes_lollipop_gg(maf, c0$gene, aa_col = aa_for(maf, c0$aa), tx = c0$tx, label_at = c0$label_at,
+                      show_rate = c0$rate)
     }
 
     shiny::observeEvent(input$run, {
@@ -163,7 +146,7 @@ mod_wes_lolli_server <- function(id, rv, log_rv) {
                  n_pos = length(rp$all), n_recurrent = length(rp$positions),
                  beyond = if (is.finite(len)) sum(rp$all > len) else NA_integer_,
                  aa_length = len)
-      ok <- with_progress_notify(wes_dry_run(function() draw_with(maf, c0)),
+      ok <- with_progress_notify(wes_dry_run(function() draw_plot_object(draw_with(maf, c0))),
                                  message = "Drawing the lollipop plot...")
       if (is.null(ok)) return(NULL)
       cfg(c0)
@@ -235,8 +218,6 @@ mod_wes_lolli_server <- function(id, rv, log_rv) {
       shiny::req(rv$maf, c0)
       draw_with(rv$maf, c0)
     }
-    output$plot <- render_base_plot(draw_lolli)
-    register_figure_download(output, input, "plot", draw_lolli, "wes_lollipop",
-                             width = 12, height = 6)
+    render_step_plot(output, input, "plot", draw_lolli, name = "wes_lollipop", width = 12, height = 6)
   })
 }

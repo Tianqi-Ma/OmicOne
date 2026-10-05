@@ -111,7 +111,7 @@ mod_annotate_ui <- function(id) {
       run_button(ns("run_azimuth"), "Run Azimuth", "运行 Azimuth")
     )
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Cell-type annotation", zh = "细胞类型注释"),
     subtitle  = list(en = "Name each cluster by hand from its markers, or predict labels with SingleR / Azimuth.",
                      zh = "根据标志基因手动为簇命名，或用 SingleR / Azimuth 预测标签。"),
@@ -224,7 +224,7 @@ mod_annotate_server <- function(id, rv, log_rv) {
       obj <- rv$obj
       idents <- as.character(current_idents(obj))
       obj$celltype <- unname(labels[idents])
-      rv$obj <- obj
+      rv$obj <- color_celltypes(obj)
       res$labels <- labels
       res$labels_sig <- clustering_sig(obj)
       res$method <- "manual"
@@ -254,7 +254,7 @@ mod_annotate_server <- function(id, rv, log_rv) {
         annotate_singler(rv$obj, ref, labels, current_idents(rv$obj))
       }, message = "Running SingleR (may download a reference)...")
       if (is.null(out)) return(NULL)
-      rv$obj <- out$obj
+      rv$obj <- color_celltypes(out$obj)
       res$tab <- out$table
       res$method <- "singler"
       res$labels <- NULL
@@ -280,7 +280,7 @@ mod_annotate_server <- function(id, rv, log_rv) {
                          clusters = current_idents(rv$obj))
       }, message = "Running Azimuth (needs internet)...")
       if (is.null(out)) return(NULL)
-      rv$obj <- out$obj
+      rv$obj <- color_celltypes(out$obj)
       res$tab <- out$table
       res$method <- "azimuth"
       res$labels <- NULL

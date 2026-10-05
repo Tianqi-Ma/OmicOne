@@ -150,7 +150,7 @@ mod_export_ui <- function(id) {
     shiny::downloadButton(ns("download_script"),
                           i18n("Download R script", "下载 R 脚本"), class = "w-100")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Export & reproducibility", zh = "导出与复现"),
     subtitle  = list(en = "Take the object, the tables, and a reproducible log with you.",
                      zh = "带走对象、表格与可复现日志。"),

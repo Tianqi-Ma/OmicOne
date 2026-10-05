@@ -66,7 +66,7 @@ mod_wes_tmb_ui <- function(id) {
     shiny::checkboxInput(ns("log"), i18n("Log scale", "对数坐标"), value = TRUE),
     run_button(ns("run"), "Compute TMB", "计算 TMB")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Tumour mutational burden", zh = "肿瘤突变负荷 TMB"),
     subtitle  = list(en = "Mutations per captured megabase, benchmarked against 33 TCGA cohorts.",
                      zh = "每捕获兆碱基的突变数，并与 33 个 TCGA 队列对照。"),
@@ -184,25 +184,11 @@ mod_wes_tmb_server <- function(id, rv, log_rv) {
     }
     render_step_plot(output, input, "plot", tmb_gg, name = "wes_tmb", width = 10, height = 6)
 
-    draw_tcga <- with_text_boost(function() {
+    draw_tcga <- function() {
       shiny::req(rv$maf, res$out)
-      lab <- wes_tcga_label(rv$maf_source)
-      args <- list(maf = res$out$maf, cohortName = lab, capture_size = res$out$capture,
-                   logscale = res$log, cohortFontSize = 1.0, axisFontSize = 1.15)
-      if (wes_has_arg("tcgaCompare", "rm_zero")) args$rm_zero <- TRUE
-      suppressWarnings(do.call(maftools::tcgaCompare, args))
-      note <- sprintf("Input: %s = non-synonymous / %s Mb; zero-mutation samples excluded.",
-                      lab, format(signif(res$out$capture, 4)))
-      if (abs(res$out$capture - 35.8) > 1e-6) {
-        note <- paste(note, "TCGA MC3: mutations within the 35.8 Mb SureSelect capture — different territory, caller and filters; compare orders of magnitude, not decimals.")
-      } else {
-        note <- paste(note, "TCGA MC3 uses the same 35.8 Mb denominator, but its calls come from the MC3 pipeline.")
-      }
-      graphics::mtext(note, side = 3, line = 0.4, adj = 0, cex = 0.8, col = "#c1476b")
-    })
-    output$tcga <- render_base_plot(draw_tcga)
-    register_figure_download(output, input, "tcga", draw_tcga,
-                             "wes_tmb_vs_tcga", width = 12, height = 8)
+      wes_tcga_gg(res$out$maf, res$out$capture, cohort = wes_tcga_label(rv$maf_source), log_scale = res$log)
+    }
+    render_step_plot(output, input, "tcga", draw_tcga, name = "wes_tmb_vs_tcga", width = 13, height = 7)
 
     view <- shiny::reactive({
       shiny::req(res$out)

@@ -92,7 +92,7 @@ mod_trajectory_ui <- function(id) {
       shiny::selectInput(ns("time_col"), NULL, choices = NULL)),
     run_button(ns("run"), "Run trajectory", "运行轨迹分析")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Trajectory / pseudotime", zh = "轨迹 / 拟时序"),
     subtitle  = list(en = "Order cells along a differentiation path.",
                      zh = "沿分化路径为细胞排序。"),

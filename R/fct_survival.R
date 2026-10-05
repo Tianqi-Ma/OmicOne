@@ -696,10 +696,10 @@ km_risk <- function(fit, breaks) {
 #' @return A ggplot (or patchwork) object.
 #' @keywords internal
 km_plot <- function(fit, lr = NULL, title = "Survival", time_label = "Months",
-                    hr = NULL, ci = TRUE, risk_table = TRUE, note = NULL) {
+                    hr = NULL, ci = TRUE, risk_table = TRUE, note = NULL, colors = NULL) {
   d <- km_tidy(fit)
   groups <- levels(d$group)
-  cols <- stats::setNames(sc_palette(length(groups)), groups)
+  cols <- if (!is.null(colors) && all(groups %in% names(colors))) colors[groups] else km_group_colors(groups)
   cens <- d[d$n_censor > 0, , drop = FALSE]
   breaks <- pretty(c(0, max(d$time, na.rm = TRUE)), n = 5)
   breaks <- breaks[breaks <= max(d$time, na.rm = TRUE)]
@@ -744,13 +744,10 @@ km_plot <- function(fit, lr = NULL, title = "Survival", time_label = "Months",
   if (length(labs)) {
     p <- p + ggplot2::annotate("text", x = 0, y = 0.03, hjust = 0, vjust = 0,
                                label = paste(labs, collapse = "\n"),
-                               size = 3.8, colour = "#5b6773", lineheight = 1.1)
+                               size = 3.8, colour = style_tokens()$muted, lineheight = 1.1)
   }
 
-  # patchwork < 1.2.0 cannot lay out ggplot2 >= 3.5 plots (fails at print time)
-  pw_ok <- has_pkg("patchwork") &&
-    utils::packageVersion("patchwork") >= "1.2.0"
-  if (!isTRUE(risk_table) || !pw_ok || !length(breaks)) return(p)
+  if (!isTRUE(risk_table) || !length(breaks)) return(p)
   rk <- tryCatch(km_risk(fit, breaks), error = function(e) NULL)
   if (is.null(rk) || !nrow(rk)) return(p)
   tbl <- ggplot2::ggplot(rk, ggplot2::aes(x = .data$time, y = .data$group,
@@ -764,5 +761,23 @@ km_plot <- function(fit, lr = NULL, title = "Survival", time_label = "Months",
     ggplot2::theme(panel.grid = ggplot2::element_blank(),
                    axis.text.x = ggplot2::element_blank(),
                    plot.title = ggplot2::element_text(size = 10, face = "plain"))
-  p / tbl + patchwork::plot_layout(heights = c(4, 1))
+  compose_grid(list(p, tbl), nrow = 2, ncol = 1, heights = c(4, 1.1))
+}
+
+#' Colours of survival groups: fixed meanings where the labels have them
+#'
+#' WT / Mutant, Low / High (a split of a continuous variable) and TMB low /
+#' high get the same colours in every survival figure; anything else follows
+#' [value_colors()].
+#' @param groups Group labels in plot order.
+#' @keywords internal
+km_group_colors <- function(groups) {
+  tk <- style_tokens()
+  low <- tolower(groups)
+  is_low <- low == "wt" | grepl("^(tmb )?low", low)
+  is_high <- low == "mutant" | grepl("^(tmb )?high", low)
+  if (length(groups) == 2 && sum(is_low) == 1 && sum(is_high) == 1) {
+    return(stats::setNames(ifelse(is_low, tk$wt, tk$mutant), groups))
+  }
+  value_colors(groups, levels = groups)
 }

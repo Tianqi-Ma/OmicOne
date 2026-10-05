@@ -92,7 +92,7 @@ mod_wes_import_ui <- function(id) {
     run_button(ns("run"), "Load MAF", "加载 MAF")
   )
 
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Import MAF", zh = "导入 MAF"),
     subtitle  = list(en = "Load the mutation file every later step reads from.",
                      zh = "载入突变数据——之后的每一步都从这里读取。"),

@@ -115,9 +115,12 @@ label_with_help <- function(label_en, tip_en, label_zh = label_en, tip_zh = tip_
 #' @param summary A UI output slot for the slim result summary (header strip).
 #' @param preview A UI output slot for the large preview plot(s).
 #' @param rail_width Control-rail width. Default "280px".
+#' @param id The step key (the module id). Gives the card its bottom
+#'   navigation bar (previous / next step), rendered by the app server into
+#'   `output$stepnav_<id>` (see [step_nav_bar()]).
 #' @keywords internal
 step_container <- function(title, explainer, controls, summary, preview,
-                           rail_width = "280px", subtitle = NULL) {
+                           rail_width = "280px", subtitle = NULL, id = NULL) {
   ttl <- if (is.list(title)) i18n(title$en, title$zh) else title
   sub <- NULL
   if (!is.null(subtitle)) {
@@ -141,8 +144,47 @@ step_container <- function(title, explainer, controls, summary, preview,
         shiny::div(class = "omicone-rail", controls)
       ),
       shiny::div(class = "omicone-plotwrap", preview)
-    )
+    ),
+    if (!is.null(id)) bslib::card_footer(class = "omicone-stepnav",
+                                         shiny::uiOutput(paste0("stepnav_", id)))
   )
+}
+
+#' Bottom navigation bar of a step: previous on the left, next on the right
+#'
+#' Where people look once a step has run: at the end of its results, as in any
+#' wizard. "Next" turns primary once the step is done; before that it stays a
+#' quiet outline button, so a step can still be skipped.
+#' @param steps The omics registry. @param key Current step key.
+#' @param state Function(key) -> "todo" / "done" / "stale".
+#' @keywords internal
+step_nav_bar <- function(steps, key, state) {
+  keys <- vapply(steps, function(s) s$v, character(1))
+  i <- match(key, keys)
+  if (is.na(i)) return(NULL)
+  go <- function(s, cls, label_en, label_zh, arrow_left = FALSE) {
+    shiny::tags$button(
+      type = "button", class = paste("btn omicone-stepnav-btn", cls),
+      onclick = sprintf("Shiny.setInputValue('goto','%s',{priority:'event'})", s$v),
+      if (arrow_left) shiny::span(class = "omicone-stepnav-arrow", "\u2190"),
+      shiny::span(class = "omicone-stepnav-text",
+                  shiny::span(class = "omicone-stepnav-kicker", i18n(label_en, label_zh)),
+                  shiny::span(class = "omicone-stepnav-name", i18n(s$en, s$zh))),
+      if (!arrow_left) shiny::span(class = "omicone-stepnav-arrow", "\u2192"))
+  }
+  done <- identical(state(key), "done")
+  prev <- if (i > 1) go(steps[[i - 1]], "btn-link omicone-stepnav-prev", "Previous", "上一步", arrow_left = TRUE)
+  nxt <- if (i < length(steps)) {
+    go(steps[[i + 1]], if (done) "btn-primary is-ready" else "btn-outline-secondary",
+       if (done) "Next step" else "Skip to", if (done) "下一步" else "跳到")
+  } else {
+    shiny::span(class = "omicone-stepnav-end", i18n("Last step of this pipeline", "这是本流程的最后一步"))
+  }
+  shiny::div(class = "omicone-stepnav-row",
+             shiny::div(class = "omicone-stepnav-left", prev),
+             shiny::div(class = "omicone-stepnav-mid",
+                        shiny::span(class = "omicone-stepnav-count", sprintf("%d / %d", i, length(steps)))),
+             shiny::div(class = "omicone-stepnav-right", nxt))
 }
 
 #' Primary "Run" button that shows a busy spinner while the step runs

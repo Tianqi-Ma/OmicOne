@@ -92,9 +92,9 @@ app_server <- function(input, output, session) {
 
   shiny::observeEvent(input$goto, { bslib::nav_select("steps", input$goto) })
 
-  # --- Progress chip (topbar): done/total + the next unfinished step ---------
-  # The "next step" link lives here, in the always-visible top bar, rather than
-  # floating over the workspace where it covered the figure-export row.
+  # --- Progress chip (topbar): done/total ----------------------------------
+  # Moving on is done from each step's bottom bar (step_nav_bar()), where the
+  # eye lands after reading the results.
   output$progress_chip <- shiny::renderUI({
     if (is.null(rv$omics)) return(NULL)
     steps <- steps_for(rv$omics)
@@ -103,29 +103,25 @@ app_server <- function(input, output, session) {
     keys <- vapply(steps, function(s) s$v, character(1))
     is_done <- vapply(keys, function(k) step_state(rv, k) == "done", logical(1))
     done <- sum(is_done)
-    nxt <- NULL
-    cur <- input$steps
-    if (!is.null(cur) && isTRUE(is_done[cur]) && !all(is_done)) {
-      i <- match(cur, keys)
-      undone <- which(!is_done)
-      j <- undone[undone > i][1]
-      if (is.na(j)) j <- undone[1]
-      s <- steps[[j]]
-      nxt <- shiny::tags$a(
-        class = "omicone-nextlink",
-        onclick = sprintf("Shiny.setInputValue('goto','%s',{priority:'event'})", s$v),
-        shiny::span(class = "omicone-next-label", i18n("Next:", "下一步：")),
-        shiny::strong(i18n(s$en, s$zh)), " \u2192")
-    }
     shiny::div(class = "omicone-progress",
                title = i18n("Steps completed", "已完成步骤"),
                shiny::span(class = "omicone-progress-num",
                            sprintf("%d/%d", done, n)),
                shiny::div(class = "omicone-progress-bar",
                           shiny::div(class = "omicone-progress-fill",
-                                     style = sprintf("width:%.0f%%", 100 * done / n))),
-               nxt)
+                                     style = sprintf("width:%.0f%%", 100 * done / n))))
   })
+
+  # --- Bottom bar of every step: previous / next ------------------------------
+  for (om in c("sc", "wes")) {
+    for (s in steps_for(om)) local({
+      key <- s$v
+      omics <- om
+      output[[paste0("stepnav_", key)]] <- shiny::renderUI({
+        step_nav_bar(steps_for(omics), key, function(k) step_state(rv, k))
+      })
+    })
+  }
 
   # --- Banner above the workspace when the current step is stale ------------
   output$stale_banner <- shiny::renderUI({

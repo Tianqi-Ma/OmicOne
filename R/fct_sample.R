@@ -351,11 +351,11 @@ pseudobulk_volcano <- function(df, fdr = 0.05, title = "", n_label = 12) {
   lab <- utils::head(df[df$sig != "ns", , drop = FALSE], n_label)
   p <- ggplot2::ggplot(df, ggplot2::aes(x = .data$logFC, y = .data$y)) +
     ggplot2::geom_point(ggplot2::aes(colour = .data$sig), size = 1.2, alpha = 0.75) +
-    ggplot2::scale_colour_manual(values = c(down = "#2f81c7", ns = "#b8c0c8", up = "#c1476b"),
+    ggplot2::scale_colour_manual(values = c(down = style_tokens()$down, ns = style_tokens()$ns, up = style_tokens()$up),
                                  labels = c(down = sprintf("down, FDR < %g", fdr), ns = "n.s.",
                                             up = sprintf("up, FDR < %g", fdr)),
                                  drop = FALSE, name = NULL) +
-    ggplot2::geom_vline(xintercept = 0, colour = "#9aa5b1", linewidth = 0.3) +
+    ggplot2::geom_vline(xintercept = 0, colour = style_tokens()$faint, linewidth = 0.3) +
     ggplot2::labs(x = "log2 fold change", y = expression(-log[10] ~ italic(p)), title = title) +
     omicone_theme()
   if (nrow(lab)) {
@@ -373,8 +373,8 @@ pseudobulk_overview_plot <- function(overview, fdr = 0.05, ref = "", alt = "") {
   d$cell_type <- factor(d$cell_type, levels = rev(overview$cell_type[order(-(overview$up + overview$down))]))
   ggplot2::ggplot(d, ggplot2::aes(x = .data$n, y = .data$cell_type, fill = .data$dir)) +
     ggplot2::geom_col(width = 0.7) +
-    ggplot2::geom_vline(xintercept = 0, colour = "#5b6773", linewidth = 0.3) +
-    ggplot2::scale_fill_manual(values = c(up = "#c1476b", down = "#2f81c7"),
+    ggplot2::geom_vline(xintercept = 0, colour = style_tokens()$muted, linewidth = 0.3) +
+    ggplot2::scale_fill_manual(values = c(up = style_tokens()$up, down = style_tokens()$down),
                                labels = c(up = sprintf("higher in %s", alt), down = sprintf("lower in %s", alt)),
                                name = NULL) +
     ggplot2::scale_x_continuous(labels = abs) +
@@ -384,9 +384,10 @@ pseudobulk_overview_plot <- function(overview, fdr = 0.05, ref = "", alt = "") {
 
 #' Per-sample proportions of each cell type, by condition, with the FDR
 #' @keywords internal
-abundance_plot <- function(res) {
+abundance_plot <- function(res, cond_colors = NULL) {
   props <- attr(res, "props")
   cond <- attr(res, "condition")
+  cond_colors <- cond_colors %||% value_colors(cond, levels = levels(cond))
   d <- data.frame(sample = rep(rownames(props), ncol(props)),
                   group = rep(colnames(props), each = nrow(props)),
                   prop = as.vector(props), condition = rep(as.character(cond), ncol(props)))
@@ -395,13 +396,13 @@ abundance_plot <- function(res) {
   lab <- data.frame(group = factor(res$group, levels = res$group),
                     txt = sprintf("FDR = %s", formatC(res$fdr, format = "g", digits = 2)))
   ggplot2::ggplot(d, ggplot2::aes(x = .data$condition, y = .data$prop)) +
-    ggplot2::geom_boxplot(outlier.shape = NA, width = 0.55, colour = "#9aa5b1") +
+    ggplot2::geom_boxplot(outlier.shape = NA, width = 0.55, colour = style_tokens()$faint) +
     ggplot2::geom_point(ggplot2::aes(colour = .data$condition),
                         position = ggplot2::position_jitter(width = 0.12, height = 0, seed = 1), size = 1.9) +
     ggplot2::geom_text(data = lab, ggplot2::aes(x = (nlevels(cond) + 1) / 2, y = Inf, label = .data$txt),
-                       inherit.aes = FALSE, vjust = 1.4, size = 3, colour = "#5b6773") +
+                       inherit.aes = FALSE, vjust = 1.4, size = 3, colour = style_tokens()$muted) +
     ggplot2::facet_wrap(~ group, scales = "free_y") +
-    ggplot2::scale_colour_manual(values = sc_palette(nlevels(cond)), guide = "none") +
+    scale_group(cond_colors[levels(cond)], "colour", guide = "none") +
     ggplot2::scale_y_continuous(labels = function(v) paste0(round(100 * v), "%"),
                                 expand = ggplot2::expansion(mult = c(0.05, 0.22))) +
     ggplot2::labs(x = NULL, y = "share of the sample's cells") +
@@ -410,17 +411,19 @@ abundance_plot <- function(res) {
 
 #' Stacked composition bar per sample, samples ordered within condition
 #' @keywords internal
-abundance_stack_plot <- function(res) {
+abundance_stack_plot <- function(res, group_colors = NULL) {
   props <- attr(res, "props")
   cond <- attr(res, "condition")
+  gcols <- group_colors %||% value_colors(colnames(props))
   d <- data.frame(sample = rep(rownames(props), ncol(props)),
                   group = rep(colnames(props), each = nrow(props)),
                   prop = as.vector(props), condition = rep(as.character(cond), ncol(props)))
   d$condition <- factor(d$condition, levels = levels(cond))
+  d$group <- factor(d$group, levels = names(gcols))
   ggplot2::ggplot(d, ggplot2::aes(x = .data$sample, y = .data$prop, fill = .data$group)) +
     ggplot2::geom_col(width = 0.85) +
     ggplot2::facet_grid(~ condition, scales = "free_x", space = "free_x") +
-    ggplot2::scale_fill_manual(values = sc_palette(ncol(props)), name = NULL) +
+    scale_group(gcols, "fill", name = NULL) +
     ggplot2::scale_y_continuous(labels = function(v) paste0(round(100 * v), "%"), expand = c(0, 0)) +
     ggplot2::labs(x = NULL, y = "share of the sample's cells") +
     omicone_theme() +

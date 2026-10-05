@@ -61,7 +61,7 @@ mod_integrate_ui <- function(id) {
     shiny::numericInput(ns("dims"), NULL, value = 30, min = 2, max = 200, step = 1),
     run_button(ns("run"), "Run integration", "运行整合")
   )
-  step_container(title = list(en = "Batch integration", zh = "批次整合"),
+  step_container(id = id, title = list(en = "Batch integration", zh = "批次整合"),
                  subtitle = list(en = "Align batches so the same cell type sits together.",
                                  zh = "对齐批次，使相同细胞类型聚在一起。"),
                  explainer = explainer, controls = controls,
@@ -192,7 +192,8 @@ mod_integrate_server <- function(id, rv, log_rv) {
 
     render_step_plot(output, input, "preview", function() {
       shiny::req(res$done, res$pd)
-      integrate_plot(res$pd, res$batch %||% "batch")
+      b <- res$batch %||% "batch"
+      integrate_plot(res$pd, b, colors = if (b %in% obj_meta_cols(rv$obj)) group_colors(rv$obj, b))
     }, name = "integrate")
   })
 }

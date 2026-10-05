@@ -53,7 +53,7 @@ mod_wes_hetero_ui <- function(id) {
     shiny::uiOutput(ns("vaf_ui")),
     run_button(ns("run"), "Infer clones", "推断克隆结构")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Heterogeneity", zh = "肿瘤异质性"),
     subtitle  = list(en = "Clonal structure from allele fractions (MATH score).",
                      zh = "从等位基因频率推断克隆结构（MATH 分数）。"),
@@ -186,13 +186,11 @@ mod_wes_hetero_server <- function(id, rv, log_rv) {
                 if (s$cn) sprintf("、%d 个拷贝数改变的变异", s$cn) else "", math_zh, few_zh))
     })
 
-    draw_het <- with_text_boost(function() {
+    draw_het <- function() {
       shiny::req(res$het)
-      maftools::plotClusters(clusters = res$het, tsb = res$sample)
-    })
-    output$plot <- render_base_plot(draw_het)
-    register_figure_download(output, input, "plot", draw_het,
-                             "wes_heterogeneity", width = 10, height = 7)
+      wes_hetero_gg(res$het, res$sample)
+    }
+    render_step_plot(output, input, "plot", draw_het, name = "wes_heterogeneity", width = 9, height = 5.5)
 
     view <- shiny::reactive({
       d <- het_df()

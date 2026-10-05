@@ -67,7 +67,7 @@ mod_wes_driver_ui <- function(id) {
     shiny::numericInput(ns("top"), NULL, value = 25, min = 5, max = 60, step = 1),
     run_button(ns("run"), "Find drivers", "检测驱动基因")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Drivers & interactions", zh = "驱动基因与互作"),
     subtitle  = list(en = "Positional-clustering driver calls and pairwise gene interactions.",
                      zh = "基于位点聚集识别驱动基因，并检验基因两两互作。"),
@@ -203,28 +203,17 @@ mod_wes_driver_server <- function(id, rv, log_rv) {
 
     draw_drv <- function() {
       shiny::req(res$drv)
-      s <- stats()
-      maftools::plotOncodrive(res = data.table::as.data.table(res$drv), fdrCutOff = res$fdr,
-                              useFraction = TRUE,
-                              labelSize = adaptive_cex(max(1, s$sig), base = 0.85,
-                                                       n_ref = 12, lo = 0.6, hi = 0.95))
+      wes_oncodrive_gg(res$drv, fdr = res$fdr)
     }
-    output$drv <- render_base_plot(draw_drv)
-    register_figure_download(output, input, "drv", draw_drv, "wes_oncodrive",
-                             width = 10, height = 6)
+    render_step_plot(output, input, "drv", draw_drv, name = "wes_oncodrive", width = 9, height = 6)
 
-    draw_int <- with_text_boost(function() {
+    draw_int <- function() {
       shiny::req(rv$maf, res$int)
-      args <- list(maf = rv$maf, top = res$top, pvalue = c(0.05, 0.1),
-                   fontSize = adaptive_cex(res$top, n_ref = 25, lo = 0.8, hi = 1.2),
-                   countsFontSize = 0.9)
-      if (wes_has_arg("somaticInteractions", "plotPadj")) args$plotPadj <- TRUE
-      invisible(do.call(maftools::somaticInteractions, args))
-    })
-    output$int <- render_base_plot(draw_int)
-    register_figure_download(output, input, "int", draw_int, "wes_interactions",
-                             width = function() max(8, min(14, 2 + 0.3 * res$top)),
-                             height = 8)
+      wes_interactions_gg(res$int, genes = utils::head(wes_genes(rv$maf), res$top))
+    }
+    render_step_plot(output, input, "int", draw_int, name = "wes_interactions",
+                     width = function() max(7, min(13, 2.5 + 0.32 * res$top)),
+                     height = function() max(6.5, min(13, 2 + 0.32 * res$top)))
 
     has_maf <- function() !is.null(rv$maf)
     drv_view <- shiny::reactive({

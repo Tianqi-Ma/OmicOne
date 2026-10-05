@@ -53,7 +53,7 @@ mod_reduce_ui <- function(id) {
     shiny::numericInput(ns("npcs"), NULL, value = 50, min = 2, max = 200, step = 1),
     run_button(ns("run"), "Select features & run PCA", "选择特征并运行 PCA")
   )
-  step_container(title = list(en = "Feature selection & PCA", zh = "特征选择与 PCA"),
+  step_container(id = id, title = list(en = "Feature selection & PCA", zh = "特征选择与 PCA"),
                  subtitle = list(en = "Highly variable genes, then PCA compression.",
                                  zh = "高变基因筛选，再做 PCA 压缩。"),
                  explainer = explainer, controls = controls,

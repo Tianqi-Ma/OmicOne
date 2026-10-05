@@ -77,7 +77,7 @@ mod_embed_ui <- function(id) {
                          value = FALSE),
     run_button(ns("run"), "Run embedding", "运行降维")
   )
-  step_container(title = list(en = "Embedding (UMAP / t-SNE)", zh = "降维可视化"),
+  step_container(id = id, title = list(en = "Embedding (UMAP / t-SNE)", zh = "降维可视化"),
                  subtitle = list(en = "A 2D view of the cell neighbourhood graph.",
                                  zh = "细胞邻域图的二维视图。"),
                  explainer = explainer, controls = controls,

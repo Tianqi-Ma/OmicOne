@@ -64,7 +64,7 @@ mod_wes_filter_ui <- function(id) {
     shiny::numericInput(ns("max_nalt"), NULL, value = NA, min = 0, step = 1),
     run_button(ns("run"), "Apply filters", "应用过滤")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Variant filters", zh = "变异过滤"),
     subtitle  = list(en = "Keep confident somatic calls; see what each filter removes.",
                      zh = "保留可信的体细胞突变；查看每个过滤条件去掉了什么。"),

@@ -115,7 +115,7 @@ mod_cellcycle_signatures_ui <- function(id) {
                     tip_zh = "选择要在嵌入图上显示的评分或 Phase。"),
     shiny::uiOutput(ns("preview_ui"))
   )
-  step_container(title = list(en = "Cell cycle & signatures", zh = "细胞周期与信号评分"),
+  step_container(id = id, title = list(en = "Cell cycle & signatures", zh = "细胞周期与信号评分"),
                  subtitle = list(en = "Score cell-cycle phase and gene-set activity per cell.",
                                  zh = "为每个细胞评定细胞周期时相与基因集活性。"),
                  explainer = explainer, controls = controls,
@@ -298,9 +298,9 @@ mod_cellcycle_signatures_server <- function(id, rv, log_rv) {
       feature <- input$feature
       shiny::req(feature, feature %in% obj_meta_cols(obj))
       if (identical(feature, "Phase")) {
-        sc_dimplot(obj, group_by = "Phase")
+        sc_dim_plot(obj, group_by = "Phase", label = FALSE)
       } else {
-        sc_featureplot(obj, features = feature)
+        sc_feature_plot(obj, feature)
       }
     }, name = "cellcycle_signatures")
   })

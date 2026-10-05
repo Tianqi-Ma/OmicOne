@@ -221,9 +221,13 @@ Rules:
   shows it automatically; a step whose output is not a plot puts
   `explain_scene("<step>", en, zh)` in its empty preview.
 * **Every figure is downloadable**: `preview_plot_ui(download = TRUE)` paired
-  with `render_step_plot()` (ggplot / ComplexHeatmap objects) or
-  `render_base_plot()` + `register_figure_download()` (base graphics,
-  maftools). The file must be the same closure as the screen.
+  with `render_step_plot()` (a ggplot, a `compose_grid()` figure or a
+  ComplexHeatmap). The file must be the same closure as the screen. Figures are
+  ggplot2 in the shared style (§5.2); never print a package's own base-graphics
+  or default plot (maftools::oncoplot, Seurat::DimPlot, ...).
+* **Step navigation** is the bar at the bottom of every step
+  (`step_container(id = id, ...)` + `step_nav_bar()`): previous on the left,
+  next on the right, highlighted once the step is done.
 * **Errors** never crash the session: compute goes through
   `with_progress_notify()`, drawing through the renderers, which turn errors
   into a readable message on the canvas.
@@ -265,13 +269,14 @@ Rules:
   sync script). No inline `style=` attributes except one-off layout tweaks.
 * Layout per step: header (title, summary pills, subtitle) → collapsed explainer
   strip → control rail (left, 280 px) + plot area (fills the rest).
-* Plots: white background (what gets downloaded), `omicone_theme()` for ggplot,
-  `sc_palette()` for categorical colours, colour-blind-safe pairs for binary
-  contrasts (`#3b6ea5` kept / `#c1476b` flagged). Axis titles carry units and
-  scale ("UMI count (log10)").
+* Plots: white background (what gets downloaded), the rules of §5.2. Axis
+  titles carry units and scale ("UMI count (log10)").
 * Fonts: system stack from `app_font_stack()`. No web-font downloads — the app
   must render offline and where Google is blocked.
-* Nothing floats over the workspace. Global actions live in the top bar.
+* Nothing floats over the workspace. Global actions live in the top bar;
+  moving between steps happens in each step's bottom bar.
+* The empty result area shows the step's animation as large as the area
+  allows (`canvas.omicone-explain` sizing in custom.css).
 * Motion is quiet: a step fades in when opened, a new insight rises in; every
   animation is switched off under `prefers-reduced-motion`.
 
@@ -298,6 +303,34 @@ the entry point for beginners and the seed of a future interactive tutorial.
 * Check every change: `node tools/check_explain.js` (no exceptions, no
   non-finite coordinates, every step has a scene) and look at
   `docs/explain-gallery.html` in light and dark, EN and 中.
+
+### 5.2 Figures and colours (fct_style.R, fct_sc_plots.R, fct_wes_plots.R)
+
+One look for every figure, in both pipelines.
+
+* **ggplot2 only.** `omicone_theme(grid =)` everywhere; `omicone_dim_theme()`
+  plus `dim_corner_axes()` for embeddings. Multi-panel figures are built with
+  `compose_grid()` (aligns panels itself; works without patchwork). The
+  single-cell building blocks are `sc_dim_plot()`, `sc_feature_plot()`,
+  `sc_violin_plot()`, `sc_dot_plot()`, `sc_heatmap()`; the WES ones are the
+  `wes_*_gg()` functions. Seurat's and maftools' plotting functions are not
+  called. scop figures (trajectory, velocity, dynamic heatmaps, enrichment) are
+  allowed where we have no equivalent, coloured through `scop_group_prep()`.
+* **A level keeps its colour everywhere.** Colour a grouping with
+  `group_colors(obj, col)` (or `value_colors(values)` when there is no
+  object), looked up by level *name*. The step that creates a grouping stores
+  its map (`set_group_colors()`: clustering for its columns; annotation via
+  `color_celltypes()`, so a cell type takes the colour of its cluster). Never
+  pass `sc_palette(n)` by position to a grouping.
+* **Fixed meanings, fixed colours** (`style_tokens()`): kept / removed, up /
+  down, mutant / WT (also low / high splits, `km_group_colors()`), cell-cycle
+  phases and malignancy calls (`style_known_groups()`), variant classes
+  (`wes_vc_colors()`), base changes (`wes_sbs_colors()`, COSMIC). Expression
+  uses `style_seq_colors()`; z-scores and fold changes `style_div_colors()`
+  (blue low, red high). No literal hex colours in plotting code.
+* Levels are ordered by `level_order()` (natural sort, "Unassigned" last).
+* Check new figures by drawing them (`draw_plot_object()`) in tests, and look
+  at them: legend not clipped, labels readable at the download size.
 
 ---
 

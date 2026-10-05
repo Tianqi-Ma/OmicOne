@@ -73,7 +73,7 @@ mod_viz_ui <- function(id) {
     shiny::downloadButton(ns("download"),
                           i18n("Download plot", "下载图片"), class = "w-100")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Visualize", zh = "可视化"),
     subtitle  = list(en = "Explore any gene or grouping on the embedding.",
                      zh = "在嵌入图上自由查看任何基因或分组。"),
@@ -128,7 +128,6 @@ mod_viz_server <- function(id, rv, log_rv) {
     current_plot <- shiny::reactive({
       obj <- rv$obj
       shiny::req(obj)
-      if (!require_pkgs("Seurat", "Visualization")) return(NULL)
       genes <- parse_genes(input$genes)
       red <- reduction()
       tryCatch({
@@ -142,29 +141,25 @@ mod_viz_server <- function(id, rv, log_rv) {
                               mask = TRUE)
               if (!is.null(p)) return(p)
             }
-            Seurat::DimPlot(obj, reduction = red, group.by = input$meta_col) +
-              omicone_theme()
+            sc_dim_plot(obj, red, input$meta_col)
           },
           feature = {
             shiny::validate(shiny::need(length(genes) > 0, "Enter at least one gene."))
             shiny::validate(shiny::need(length(red) && !is.na(red),
                                         "No embedding found. Run an embedding first."))
-            Seurat::FeaturePlot(obj, features = genes, reduction = red) &
-              omicone_theme()
+            sc_feature_plot(obj, genes, red)
           },
           violin = {
             shiny::validate(shiny::need(length(genes) > 0, "Enter at least one gene."))
-            Seurat::VlnPlot(obj, features = genes, group.by = input$meta_col) &
-              omicone_theme()
+            sc_violin_plot(obj, genes, input$meta_col)
           },
           dotplot = {
             shiny::validate(shiny::need(length(genes) > 0, "Enter at least one gene."))
-            Seurat::DotPlot(obj, features = genes, group.by = input$meta_col) +
-              omicone_theme()
+            sc_dot_plot(obj, genes, input$meta_col)
           },
           heatmap = {
             shiny::validate(shiny::need(length(genes) > 0, "Enter at least one gene."))
-            Seurat::DoHeatmap(obj, features = genes, group.by = input$meta_col)
+            sc_heatmap(obj, genes, input$meta_col)
           })
       },
       # req()/validate() are not errors: let them through so the output stays

@@ -1,26 +1,16 @@
 #' Plotting layer: renderers, figure download, palette, text scaling
 #'
-#' Every preview goes through one of two renderers -- [render_scop_plot()] for
-#' plot objects (ggplot, patchwork, ComplexHeatmap) and [render_base_plot()]
-#' for base graphics (maftools) -- which turn errors into a readable message on
-#' the canvas. [render_step_plot()] / [register_figure_download()] make the
+#' Every preview goes through [render_scop_plot()] (ggplot, compose_grid(),
+#' ComplexHeatmap objects), which turns errors into a readable message on the
+#' canvas. Figures are ggplot2 in the shared style (fct_style.R); base
+#' graphics (maftools' own plots) are not used. [render_step_plot()] / [register_figure_download()] make the
 #' same drawing downloadable. The scop plotting wrappers live in fct_scop.R.
 #'
 #' @name fct_plots
 #' @keywords internal
 NULL
 
-#' Shared minimal ggplot theme (fallback when not using a scop plot)
-#' @keywords internal
-omicone_theme <- function() {
-  ggplot2::theme_minimal(base_size = 13) +
-    ggplot2::theme(
-      panel.grid.minor = ggplot2::element_blank(),
-      panel.grid.major = ggplot2::element_line(linewidth = 0.25, colour = "#8b98a533"),
-      plot.title = ggplot2::element_text(face = "bold"),
-      legend.position = "right"
-    )
-}
+# The shared theme (omicone_theme()) and the colour registry live in fct_style.R.
 
 #' Categorical palette (curated, colour-blind-aware ordering)
 #'
@@ -184,40 +174,6 @@ register_figure_download <- function(output, input, id, draw_fn, name,
   )
 }
 
-#' Gentle text scaling: shrink as the number of labels grows
-#'
-#' `sqrt` falloff clamped to `[lo, hi]`: a handful of labels gets slightly
-#' larger text, a crowded plot slightly smaller, without extremes. Used to
-#' size maftools fonts from the number of genes / samples / labels shown.
-#' @param n Number of labels on the plot.
-#' @param base Size returned when `n == n_ref`. @param n_ref Reference count.
-#' @param lo,hi Clamp bounds.
-#' @keywords internal
-adaptive_cex <- function(n, base = 1, n_ref = 20, lo = 0.55, hi = 1.25) {
-  n <- suppressWarnings(as.numeric(n %||% NA))
-  if (length(n) != 1 || !is.finite(n) || n <= 0) return(base)
-  max(lo, min(hi, base * sqrt(n_ref / n)))
-}
-
-#' Boost base-graphics text inside a draw closure
-#'
-#' maftools' absolute cex defaults assume a small device; on a full-width
-#' browser panel they render tiny. This wraps a draw function with a temporary
-#' `par()` bump of axis / label / title text sizes. Functions that set their
-#' own cex values internally keep them (explicit values win over `par`).
-#' @param draw_fn Zero-argument draw function.
-#' @param cex Target axis text size (labels and titles slightly larger).
-#' @keywords internal
-with_text_boost <- function(draw_fn, cex = 1.15) {
-  force(draw_fn); force(cex)
-  function() {
-    op <- graphics::par(cex.axis = cex, cex.lab = cex * 1.05,
-                        cex.main = cex * 1.1, cex.sub = cex)
-    on.exit(graphics::par(op), add = TRUE)
-    draw_fn()
-  }
-}
-
 #' Render a scop/ggplot/ComplexHeatmap object to a Shiny plot output
 #'
 #' Accepts whatever a scop plotting function returns: a ggplot/patchwork object
@@ -252,11 +208,14 @@ render_preview_plot <- function(gg_expr, tooltip = "text") {
   render_scop_plot(gg_expr)
 }
 
-#' Draw a plot object on the current device (ggplot / patchwork / Heatmap)
+#' Draw a plot object on the current device (ggplot / patchwork / compose_grid / Heatmap)
 #' @param p A plot object.
 #' @keywords internal
 draw_plot_object <- function(p) {
-  if (methods::is(p, "Heatmap") || methods::is(p, "HeatmapList")) {
+  if (inherits(p, "gtable")) {                      # compose_grid() figures
+    grid::grid.newpage()
+    grid::grid.draw(p)
+  } else if (methods::is(p, "Heatmap") || methods::is(p, "HeatmapList")) {
     if (has_pkg("ComplexHeatmap")) ComplexHeatmap::draw(p) else print(p)
   } else {
     print(p)
@@ -269,8 +228,7 @@ draw_plot_object <- function(p) {
 #' The standard way a module renders a ggplot / ComplexHeatmap figure: assigns
 #' `output[[id]]` with [render_scop_plot()] and wires the export row of
 #' `preview_plot_ui(id, download = TRUE)` to the same `plot_fn`, so the
-#' downloaded file is the figure on screen. For base-graphics plots (maftools)
-#' use [render_base_plot()] + [register_figure_download()] instead.
+#' downloaded file is the figure on screen.
 #'
 #' @param output,input Module server `output` / `input`.
 #' @param id Local output id (as given to `preview_plot_ui()`).
@@ -288,33 +246,6 @@ render_step_plot <- function(output, input, id, plot_fn, name = id,
     draw_plot_object(p)
   }, name = name, width = width, height = height)
   invisible(NULL)
-}
-
-#' Render a base-graphics plot (maftools) to a Shiny plot output
-#'
-#' maftools draws with base graphics and returns nothing useful, so its calls
-#' cannot go through [render_scop_plot()], which prints an object. `plot_expr` is
-#' a function that draws as a side effect; failures become a readable message on
-#' the canvas instead of a blank panel.
-#'
-#' @param plot_expr Function that draws a plot as a side effect.
-#' @param bg Panel background. White, like the downloaded file and every other
-#'   preview (in dark mode the CSS frames the figure as a sheet of paper).
-#' @keywords internal
-render_base_plot <- function(plot_expr, bg = "white") {
-  shiny::renderPlot({
-    op <- graphics::par(bg = bg)
-    on.exit(graphics::par(op), add = TRUE)
-    ok <- tryCatch({ plot_expr(); TRUE },
-                   shiny.silent.error = function(e) NA,
-                   error = function(e) conditionMessage(e))
-    if (isTRUE(ok)) return(invisible())
-    if (is.na(ok)) { shiny::req(FALSE) }        # nothing to draw yet: stay blank
-    shiny::showNotification(paste("Plot error:", ok), type = "error", duration = 12)
-    p2 <- graphics::par(mar = c(0, 0, 0, 0)); on.exit(graphics::par(p2), add = TRUE)
-    graphics::plot.new()
-    graphics::text(0.5, 0.5, paste0("Plot error:\n", ok), col = "#c1476b", cex = 1.1)
-  })
 }
 
 # The scop plotting wrappers (CellDimPlot, FeatureDimPlot, ...) and the

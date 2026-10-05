@@ -64,7 +64,7 @@ mod_doublet_ui <- function(id) {
     shiny::numericInput(ns("threshold"), NULL, value = NA, min = 0, max = 1, step = 0.05),
     run_button(ns("run"), "Detect doublets", "检测双细胞")
   )
-  step_container(title = list(en = "Doublet removal", zh = "去除双细胞"),
+  step_container(id = id, title = list(en = "Doublet removal", zh = "去除双细胞"),
                  subtitle = list(en = "Score and remove droplets that captured two cells, per sample.",
                                  zh = "按样本为捕获了两个细胞的液滴打分并去除。"),
                  explainer = explainer, controls = controls,

@@ -219,12 +219,12 @@ wes_filter_funnel_plot <- function(funnel) {
   d <- funnel
   d$label <- factor(d$filter, levels = rev(d$filter))
   ggplot2::ggplot(d, ggplot2::aes(x = .data$nonsyn_left, y = .data$label)) +
-    ggplot2::geom_col(fill = "#2f81c7", width = 0.65) +
+    ggplot2::geom_col(fill = style_tokens()$accent, width = 0.65) +
     ggplot2::geom_text(ggplot2::aes(label = sprintf("%s%s", format(.data$nonsyn_left, big.mark = ","),
                                                     ifelse(.data$removed_nonsyn > 0,
                                                            sprintf("  (-%s)", format(.data$removed_nonsyn, big.mark = ",")),
                                                            ""))),
-                       hjust = -0.08, size = 3.4, colour = "#3d4a57") +
+                       hjust = -0.08, size = 3.4, colour = style_tokens()$text) +
     ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = c(0, 0.28))) +
     ggplot2::labs(x = "non-synonymous variants left", y = NULL) +
     omicone_theme()
@@ -238,10 +238,10 @@ wes_filter_vaf_plot <- function(values, min_vaf = NA) {
   d$status <- factor(ifelse(d$kept, "kept", "removed"), levels = c("kept", "removed"))
   p <- ggplot2::ggplot(d, ggplot2::aes(x = .data$vaf, fill = .data$status)) +
     ggplot2::geom_histogram(bins = 50, boundary = 0, colour = NA, alpha = 0.9) +
-    ggplot2::scale_fill_manual(values = c(kept = "#2f81c7", removed = "#c1476b"), name = NULL, drop = FALSE) +
+    ggplot2::scale_fill_manual(values = c(kept = style_tokens()$accent, removed = style_tokens()$removed), name = NULL, drop = FALSE) +
     ggplot2::labs(x = "variant allele fraction (tumour)", y = "non-synonymous variants") +
     omicone_theme()
-  if (is.finite(min_vaf)) p <- p + ggplot2::geom_vline(xintercept = min_vaf, linetype = 2, colour = "#5b6773")
+  if (is.finite(min_vaf)) p <- p + ggplot2::geom_vline(xintercept = min_vaf, linetype = 2, colour = style_tokens()$muted)
   p
 }
 
@@ -252,9 +252,9 @@ wes_hyper_plot <- function(hm) {
   d$rank <- seq_len(nrow(d))
   ggplot2::ggplot(d, ggplot2::aes(x = .data$rank, y = pmax(.data$nonsyn, 0.8), colour = .data$hypermutated)) +
     ggplot2::geom_point(size = 2) +
-    ggplot2::geom_hline(yintercept = attr(hm, "fence"), linetype = 2, colour = "#c1476b") +
+    ggplot2::geom_hline(yintercept = attr(hm, "fence"), linetype = 2, colour = style_tokens()$removed) +
     ggplot2::scale_y_log10() +
-    ggplot2::scale_colour_manual(values = c(`FALSE` = "#2f81c7", `TRUE` = "#c1476b"),
+    ggplot2::scale_colour_manual(values = c(`FALSE` = style_tokens()$accent, `TRUE` = style_tokens()$removed),
                                  labels = c(`FALSE` = "within range", `TRUE` = "hypermutated (flag)"), name = NULL) +
     ggplot2::labs(x = "samples, sorted", y = "non-synonymous variants (log)",
                   caption = sprintf("dashed: Tukey far-out fence on log10 counts (Q3 + 3 IQR) = %s",

@@ -63,7 +63,7 @@ mod_wes_clin_ui <- function(id) {
     shiny::numericInput(ns("min_mut"), NULL, value = 5, min = 1, max = 50, step = 1),
     run_button(ns("run"), "Run analyses", "运行分析")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Clinical / pathway / drug", zh = "临床 / 通路 / 药物"),
     subtitle  = list(en = "Tie mutations to clinical groups, pathways, and druggable categories.",
                      zh = "把突变与临床分组、通路和可成药类别联系起来。"),
@@ -227,7 +227,7 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
                 sub("^: ", "：", genes_txt), miss_zh))
     })
 
-    draw_enr <- with_text_boost(function() {
+    draw_enr <- function() {
       shiny::req(res$ran)
       if (is.null(res$enr)) {
         stop("No clinical feature selected. Attach a clinical table on the Import step to use this tab.")
@@ -237,33 +237,28 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
         stop(sprintf("No gene is enriched (OR > 1) in any level at FDR < %g. The Enrichment table lists every test.",
                      res$fdr))
       }
-      sub <- res$enr
-      sub$groupwise_comparision <- data.table::as.data.table(s$sig)
-      # pVal fixed at 0.05: maftools also uses it as the CI alpha, so the
-      # whiskers stay 95% whatever FDR cutoff the user chose
-      maftools::plotEnrichmentResults(enrich_res = sub, pVal = 0.05)
-    })
-    output$enr <- render_base_plot(draw_enr)
-    register_figure_download(output, input, "enr", draw_enr, "wes_enrichment",
-                             width = 10, height = 7)
+      wes_enrichment_gg(s$drawn, feature = res$feature %||% "")
+    }
+    render_step_plot(output, input, "enr", draw_enr, name = "wes_enrichment", width = 10,
+                     height = function() max(4.5, 1.8 + 0.42 * nrow(stats()$drawn %||% data.frame())))
 
-    draw_path <- with_text_boost(function() {
+    draw_path <- function() {
       shiny::req(rv$maf, res$ran)
       if (!is.null(res$path_err)) stop(res$path_err)
-      wes_pathways(rv$maf)
-    })
-    output$path <- render_base_plot(draw_path)
-    register_figure_download(output, input, "path", draw_path, "wes_pathways",
-                             width = 10, height = 7)
+      grDevices::pdf(NULL)
+      pw <- tryCatch(wes_pathways(rv$maf), finally = grDevices::dev.off())
+      wes_pathways_gg(pw)
+    }
+    render_step_plot(output, input, "path", draw_path, name = "wes_pathways", width = 9, height = 5.5)
 
-    draw_drug <- with_text_boost(function() {
+    draw_drug <- function() {
       shiny::req(rv$maf, res$ran)
       if (!is.null(res$drug_err)) stop(res$drug_err)
-      invisible(maftools::drugInteractions(maf = rv$maf, fontSize = 0.95))
-    })
-    output$drug <- render_base_plot(draw_drug)
-    register_figure_download(output, input, "drug", draw_drug, "wes_drugs",
-                             width = 10, height = 8)
+      grDevices::pdf(NULL)
+      dg <- tryCatch(maftools::drugInteractions(maf = rv$maf), finally = grDevices::dev.off())
+      wes_drug_gg(dg)
+    }
+    render_step_plot(output, input, "drug", draw_drug, name = "wes_drugs", width = 10, height = 6)
 
     view <- shiny::reactive({
       shiny::req(res$enr)

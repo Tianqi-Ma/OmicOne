@@ -52,17 +52,6 @@ num_input <- function(x, lo = -Inf, hi = Inf) {
   v
 }
 
-#' Can patchwork compose these ggplots on this installation?
-#'
-#' patchwork < 1.2.0 fails to draw legends with ggplot2 >= 3.5.0 ("'==' only
-#' defined for equally-sized data frames"); on such an install the previews
-#' fall back to their main panel instead of an error on the canvas.
-#' @keywords internal
-patchwork_ok <- function() {
-  if (!has_pkg("patchwork")) return(FALSE)
-  utils::packageVersion("ggplot2") < "3.5.0" || utils::packageVersion("patchwork") >= "1.2.0"
-}
-
 #' Evenly spaced row indices, at most `n_max` of them (no RNG involved)
 #' @param n Number of rows. @param n_max Cap.
 #' @keywords internal
@@ -391,12 +380,12 @@ qc_plot <- function(md, keep, thr, batch = NULL) {
     p <- p + ggplot2::geom_errorbar(data = lines,
                                     ggplot2::aes(x = .data$group, ymin = .data$y, ymax = .data$y),
                                     inherit.aes = FALSE, width = 0.85, linetype = "dashed",
-                                    colour = "#c1476b", linewidth = 0.6)
+                                    colour = style_tokens()$removed, linewidth = 0.6)
   }
   n_grp <- length(unique(grp))
   p <- p +
     ggplot2::facet_wrap(~metric, scales = "free_y", nrow = 1) +
-    ggplot2::scale_colour_manual(values = c(kept = "#3b6ea5", flagged = "#c1476b"),
+    ggplot2::scale_colour_manual(values = c(kept = style_tokens()$kept, flagged = style_tokens()$removed),
                                  drop = FALSE, name = NULL) +
     ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size = 2.5, alpha = 1))) +
     ggplot2::labs(x = if (is.null(batch)) NULL else batch, y = NULL,
@@ -524,7 +513,7 @@ doublet_plot <- function(pd, threshold = NULL) {
   n_d <- sum(pd$class == "doublet", na.rm = TRUE)
   p <- ggplot2::ggplot(pd, ggplot2::aes(x = .data$score, fill = .data$class)) +
     ggplot2::geom_histogram(bins = 50, alpha = 0.8, position = "identity", na.rm = TRUE) +
-    ggplot2::scale_fill_manual(values = c(singlet = "#3b6ea5", doublet = "#c1476b"),
+    ggplot2::scale_fill_manual(values = c(singlet = style_tokens()$kept, doublet = style_tokens()$removed),
                                drop = FALSE, na.value = "grey60", name = NULL) +
     ggplot2::labs(x = "Doublet score (scDblFinder)", y = "Cells",
                   title = sprintf("Doublet scores: %s of %s cells called doublets",
@@ -634,7 +623,7 @@ normalize_diag_plot <- function(dd, method = "") {
                     txt = sprintf("Spearman rho = %.2f", rho))
   dd <- dd[dd$mean_expr > 0, , drop = FALSE]
   ggplot2::ggplot(dd, ggplot2::aes(x = .data$log10_lib, y = .data$mean_expr)) +
-    ggplot2::geom_point(size = 0.5, alpha = 0.4, colour = "#3b6ea5") +
+    ggplot2::geom_point(size = 0.5, alpha = 0.4, colour = style_tokens()$kept) +
     ggplot2::geom_text(data = lab, ggplot2::aes(label = .data$txt), x = -Inf, y = Inf,
                        hjust = -0.08, vjust = 1.6, size = 4, inherit.aes = FALSE) +
     ggplot2::facet_wrap(~stage, scales = "free_y") +
@@ -784,29 +773,31 @@ reduce_plot <- function(hvg, pv) {
   ylab <- if (identical(pv$basis[1], "total")) "Variance explained (% of total)"
           else "Variance explained (% of computed PCs)"
   p_elb <- ggplot2::ggplot(pv, ggplot2::aes(x = .data$PC, y = .data$pct)) +
-    ggplot2::geom_line(colour = "#7d8b8f", linewidth = 0.4) +
-    ggplot2::geom_point(colour = "#3b6ea5", size = 1.4) +
+    ggplot2::geom_line(colour = style_tokens()$faint, linewidth = 0.4) +
+    ggplot2::geom_point(colour = style_tokens()$kept, size = 1.4) +
     ggplot2::labs(x = "Principal component", y = ylab,
                   title = sprintf("PCA: first 10 PCs explain %.1f%%",
                                   pv$cum[min(10, nrow(pv))])) +
     omicone_theme()
-  if (is.null(hvg) || !patchwork_ok()) return(p_elb)
+  if (is.null(hvg)) return(p_elb)
   hvg <- hvg[order(hvg$variable), , drop = FALSE]
   top <- utils::head(hvg[hvg$variable, , drop = FALSE][order(-hvg$score[hvg$variable]), ], 10)
   p_hvg <- ggplot2::ggplot(hvg, ggplot2::aes(x = .data$mean, y = .data$score,
                                              colour = .data$variable)) +
     ggplot2::geom_point(size = 0.6, alpha = 0.6, na.rm = TRUE) +
     ggplot2::geom_text(data = top, ggplot2::aes(label = .data$gene), size = 3,
-                       vjust = -0.6, check_overlap = TRUE, colour = "grey20",
+                       vjust = -0.6, check_overlap = TRUE, colour = style_tokens()$ink,
                        show.legend = FALSE) +
-    ggplot2::scale_colour_manual(values = c(`TRUE` = "#c1476b", `FALSE` = "grey70"),
+    ggplot2::scale_colour_manual(values = c(`TRUE` = style_tokens()$removed, `FALSE` = style_tokens()$ns),
                                  labels = c(`TRUE` = "variable", `FALSE` = "other"),
                                  name = NULL) +
     ggplot2::labs(x = attr(hvg, "xlab"), y = attr(hvg, "ylab"),
                   title = sprintf("%s variable genes", format(sum(hvg$variable), big.mark = ","))) +
-    omicone_theme()
+    omicone_theme() +
+    ggplot2::theme(legend.position = "bottom")
   if (isTRUE(attr(hvg, "logx"))) p_hvg <- p_hvg + ggplot2::scale_x_log10()
-  patchwork::wrap_plots(p_hvg, p_elb, widths = c(1.2, 1))
+  compose_grid(list(p_hvg, p_elb + ggplot2::theme(legend.position = "bottom")), nrow = 1, ncol = 2,
+               widths = c(1.2, 1))
 }
 
 # ---- Integration ------------------------------------------------------------
@@ -991,19 +982,23 @@ integrate_plot_data <- function(obj, batch, reduction = "pca", dims = 30) {
 
 #' Integration preview: batches on the uncorrected and integrated spaces
 #' @param pd Output of [integrate_plot_data()]. @param batch Batch column name.
+#' @param colors Named batch colours (default: from the levels).
 #' @keywords internal
-integrate_plot <- function(pd, batch) {
+integrate_plot <- function(pd, batch, colors = NULL) {
   df <- pd$df
-  n_b <- length(unique(df$batch))
+  cols <- colors %||% value_colors(df$batch)
+  df$batch <- factor(as.character(df$batch), levels = names(cols))
+  set.seed(1)
+  df <- df[sample.int(nrow(df)), , drop = FALSE]
   ggplot2::ggplot(df, ggplot2::aes(x = .data$dim1, y = .data$dim2, colour = .data$batch)) +
-    ggplot2::geom_point(size = 0.4, alpha = 0.6) +
+    ggplot2::geom_point(size = dim_point_size(nrow(df) / 2), alpha = 0.7, stroke = 0, shape = 16) +
     ggplot2::facet_wrap(~panel, scales = "free") +
-    ggplot2::scale_colour_manual(values = sc_palette(n_b), name = batch) +
-    ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size = 2.5, alpha = 1))) +
-    ggplot2::labs(x = "Dimension 1", y = "Dimension 2",
-                  title = "Batches before and after integration",
+    scale_group(cols, "colour", name = batch) +
+    ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size = 3, alpha = 1))) +
+    ggplot2::labs(title = "Batches before and after integration",
                   subtitle = "Mixing: kNN (k = 30) batch entropy / entropy of the batch composition (1 = fully mixed)") +
-    omicone_theme()
+    omicone_dim_theme() +
+    ggplot2::theme(aspect.ratio = NULL, strip.text = ggplot2::element_text(hjust = 0.5))
 }
 
 # ---- Clustering -------------------------------------------------------------
@@ -1084,6 +1079,7 @@ cluster_obj <- function(obj, reduction = "pca", dims = 30, resolutions = 0.5,
     cols[[as.character(res)]] <- paste0(graphs[2], "_res.", res)
   }
   obj@misc$omicone_cluster_cols <- cols
+  for (cl in cols) obj <- set_group_colors(obj, cl, extend_colors(NULL, level_order(obj_meta(obj)[[cl]])))
   cluster_set_active(obj, cols[[1]])
 }
 
@@ -1098,7 +1094,7 @@ cluster_set_active <- function(obj, col) {
   SeuratObject::Idents(obj) <- col
   obj$seurat_clusters <- SeuratObject::Idents(obj)
   obj@misc$omicone_cluster_col <- col
-  obj
+  set_group_colors(obj, "seurat_clusters", group_colors(obj, col))
 }
 
 #' Reproducible R code for the clustering step
@@ -1127,31 +1123,23 @@ cluster_log_code <- function(reduction, dims, resolutions, algorithm, k = 20, se
 #' @keywords internal
 cluster_plot <- function(obj, col, label = "") {
   md <- obj_meta(obj)
-  cl <- factor(md[[col]])
+  cols <- group_colors(obj, col)
   red <- intersect(c("umap", "tsne"), obj_reductions(obj))[1]
-  if (is.na(red)) red <- NULL
-  if (!is.null(red)) {
-    df <- embedding_df(obj, red, color_by = col)
-    df$color <- factor(df$color, levels = levels(cl))
-    return(ggplot2::ggplot(df, ggplot2::aes(.data$dim1, .data$dim2, colour = .data$color)) +
-             ggplot2::geom_point(size = 0.6, alpha = 0.75) +
-             ggplot2::scale_colour_manual(values = sc_palette(nlevels(cl)), name = "Cluster") +
-             ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size = 2.5))) +
-             ggplot2::labs(x = paste0(toupper(red), " 1"), y = paste0(toupper(red), " 2"),
-                           title = sprintf("%d clusters on %s (resolution %s)",
-                                           nlevels(cl), toupper(red), label)) +
-             omicone_theme())
+  if (!is.na(red)) {
+    return(sc_dim_plot(obj, red, col, colors = cols,
+                       title = sprintf("%d clusters on the %s (resolution %s)", length(cols), toupper(red), label)))
   }
-  counts <- as.data.frame(table(cluster = cl), stringsAsFactors = FALSE)
+  counts <- as.data.frame(table(cluster = factor(as.character(md[[col]]), levels = names(cols))),
+                          stringsAsFactors = FALSE)
   names(counts) <- c("cluster", "n")
-  counts$cluster <- factor(counts$cluster, levels = levels(cl))
+  counts$cluster <- factor(counts$cluster, levels = names(cols))
   ggplot2::ggplot(counts, ggplot2::aes(x = .data$cluster, y = .data$n, fill = .data$cluster)) +
-    ggplot2::geom_col() +
-    ggplot2::scale_fill_manual(values = sc_palette(nlevels(cl)), guide = "none") +
+    ggplot2::geom_col(width = 0.75) +
+    scale_group(cols, "fill", guide = "none") +
     ggplot2::labs(x = "Cluster", y = "Cells",
                   title = sprintf("Cluster sizes (resolution %s)", label),
                   caption = "No 2-D map yet: run the Embed step to see clusters on a UMAP.") +
-    omicone_theme()
+    omicone_theme(grid = "y")
 }
 
 # ---- Embedding --------------------------------------------------------------
@@ -1211,25 +1199,7 @@ embed_log_code <- function(method, reduction, pr, min_dist = 0.3) {
 #' @param color_by Metadata column or NULL.
 #' @keywords internal
 embed_plot <- function(obj, reduction, color_by = NULL) {
-  df <- embedding_df(obj, reduction = reduction, color_by = color_by)
-  ttl <- sprintf("%s of %s cells", toupper(reduction), format(nrow(df), big.mark = ","))
-  if (!is.null(color_by) && !is.null(df$color)) {
-    df$color <- factor(df$color)
-    n <- nlevels(df$color)
-    p <- ggplot2::ggplot(df, ggplot2::aes(x = .data$dim1, y = .data$dim2, colour = .data$color)) +
-      ggplot2::geom_point(size = 0.5, alpha = 0.7) +
-      ggplot2::scale_colour_manual(values = sc_palette(n), name = color_by) +
-      ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size = 2.5)))
-    if (n > 30) p <- p + ggplot2::theme(legend.position = "none")
-    ttl <- paste0(ttl, ", coloured by ", color_by)
-  } else {
-    p <- ggplot2::ggplot(df, ggplot2::aes(x = .data$dim1, y = .data$dim2)) +
-      ggplot2::geom_point(size = 0.5, alpha = 0.7, colour = "#3b6ea5")
-  }
-  p +
-    ggplot2::labs(x = paste0(toupper(reduction), " 1"), y = paste0(toupper(reduction), " 2"),
-                  title = ttl) +
-    omicone_theme()
+  sc_dim_plot(obj, reduction, color_by, label = !is.null(color_by) && length(group_colors(obj, color_by)) <= 30)
 }
 
 # ---- Markers ----------------------------------------------------------------
@@ -1295,33 +1265,35 @@ marker_top_n <- function(df, n = 5, padj = 0.05) {
 #' Markers preview (bar chart): top-N fold changes per group
 #' @param top Output of [marker_top_n()].
 #' @keywords internal
-markers_bar_plot <- function(top) {
-  top$cluster <- factor(top$cluster)
+markers_bar_plot <- function(top, colors = NULL) {
+  cols <- colors %||% value_colors(top$cluster)
+  top$cluster <- factor(as.character(top$cluster), levels = names(cols))
   y <- if (!is.null(top$avg_log2FC)) "avg_log2FC" else if (!is.null(top$power)) "power" else "myAUC"
   ggplot2::ggplot(top, ggplot2::aes(x = stats::reorder(.data$label, .data[[y]]),
                                     y = .data[[y]], fill = .data$cluster)) +
-    ggplot2::geom_col() +
+    ggplot2::geom_col(width = 0.75) +
     ggplot2::coord_flip() +
     ggplot2::facet_wrap(~cluster, scales = "free_y") +
     ggplot2::scale_x_discrete(labels = function(x) sub("___.*$", "", x)) +
-    ggplot2::scale_fill_manual(values = sc_palette(nlevels(top$cluster)), guide = "none") +
+    scale_group(cols, "fill", guide = "none") +
     ggplot2::labs(x = NULL, y = if (y == "avg_log2FC") "Average log2 fold change" else y,
                   title = "Top marker genes per group (adjusted p < 0.05)") +
-    omicone_theme()
+    omicone_theme(grid = "x") +
+    ggplot2::theme(axis.text.y = ggplot2::element_text(face = "italic"))
 }
 
-#' Markers preview (dot plot): Seurat::DotPlot of the top markers
+#' Markers preview (dot plot) of the top markers, grouped by the group they mark
 #' @param obj Seurat object. @param top [marker_top_n()] output.
 #' @param group_by Grouping column or NULL (Idents).
 #' @keywords internal
 markers_dot_plot <- function(obj, top, group_by = NULL) {
-  genes <- unique(top$gene)
-  args <- list(obj, features = genes)
-  if (!is.null(group_by)) args$group.by <- group_by
-  do.call(Seurat::DotPlot, args) +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust = 1)) +
-    ggplot2::labs(x = NULL, y = group_by %||% "Cluster",
-                  title = "Top markers: dot size = % of cells expressing, colour = scaled mean expression")
+  group_by <- group_by %||% "seurat_clusters"
+  lv <- names(group_colors(obj, group_by))
+  top <- top[order(match(as.character(top$cluster), lv)), , drop = FALSE]
+  top <- top[!duplicated(top$gene), , drop = FALSE]
+  sc_dot_plot(obj, top$gene, group_by,
+              gene_groups = stats::setNames(as.character(top$cluster), top$gene),
+              title = "Top markers: dot size = % of cells expressing, colour = scaled mean expression")
 }
 
 # ---- Annotation -------------------------------------------------------------
@@ -1477,6 +1449,7 @@ annotate_manual_log_code <- function(labels) {
 #' @param method "manual", "singler" or "azimuth".
 #' @keywords internal
 annotate_plot <- function(obj, tab, method = "manual") {
+  tk <- style_tokens()
   tab$name <- sprintf("%s: %s", tab$cluster, tab$label)
   tab$name <- factor(tab$name, levels = rev(tab$name))
   has_conf <- any(!is.na(tab$confidence))
@@ -1489,28 +1462,19 @@ annotate_plot <- function(obj, tab, method = "manual") {
   p_bar <- ggplot2::ggplot(tab, ggplot2::aes(y = .data$name,
                                              x = if (has_conf) .data$confidence else .data$n,
                                              fill = .data$flag)) +
-    ggplot2::geom_col() +
-    ggplot2::scale_fill_manual(values = c(assigned = "#3b6ea5", `low confidence` = "#c1476b"),
+    ggplot2::geom_col(width = 0.72) +
+    ggplot2::scale_fill_manual(values = c(assigned = tk$kept, `low confidence` = tk$removed),
                                drop = FALSE, name = NULL,
                                guide = if (has_conf) "legend" else "none") +
     ggplot2::labs(x = if (has_conf) xlab else "Cells", y = NULL,
                   title = if (has_conf) "Per-cluster confidence" else "Cells per cluster") +
-    omicone_theme()
+    omicone_theme(grid = "x") +
+    ggplot2::theme(legend.position = "bottom")
   red <- intersect(c("umap", "tsne"), obj_reductions(obj))[1]
-  if (is.na(red)) red <- NULL
-  if (is.null(red) || !patchwork_ok()) return(p_bar)
-  df <- embedding_df(obj, red, color_by = "celltype")
-  df$color <- factor(df$color)
-  cen <- stats::aggregate(cbind(dim1, dim2) ~ color, data = df, FUN = stats::median)
-  p_map <- ggplot2::ggplot(df, ggplot2::aes(x = .data$dim1, y = .data$dim2, colour = .data$color)) +
-    ggplot2::geom_point(size = 0.5, alpha = 0.7) +
-    ggplot2::geom_text(data = cen, ggplot2::aes(label = .data$color), colour = "grey15",
-                       size = 3.2, check_overlap = TRUE) +
-    ggplot2::scale_colour_manual(values = sc_palette(nlevels(df$color)), guide = "none") +
-    ggplot2::labs(x = paste0(toupper(red), " 1"), y = paste0(toupper(red), " 2"),
-                  title = sprintf("%d cell types", nlevels(df$color))) +
-    omicone_theme()
-  patchwork::wrap_plots(p_map, p_bar, widths = c(1.4, 1))
+  if (is.na(red) || !"celltype" %in% obj_meta_cols(obj)) return(p_bar)
+  p_map <- sc_dim_plot(obj, red, "celltype", title = sprintf("%d cell types", length(group_colors(obj, "celltype")))) +
+    ggplot2::theme(legend.position = "none")
+  compose_grid(list(p_map, p_bar), nrow = 1, ncol = 2, widths = c(1.35, 1))
 }
 
 # The scop-engine wrappers (enrichment, trajectory, velocity, communication,

@@ -68,7 +68,7 @@ mod_pseudobulk_ui <- function(id) {
     shiny::numericInput(ns("fdr"), NULL, value = 0.05, min = 0.001, max = 0.5, step = 0.01),
     run_button(ns("run"), "Run pseudobulk DE", "运行 pseudobulk 差异分析")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Pseudobulk differential expression", zh = "Pseudobulk 差异表达"),
     subtitle  = list(en = "Compare conditions within each cell type, with samples as replicates.",
                      zh = "在每种细胞类型内比较条件，以样本为重复单位。"),

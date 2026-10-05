@@ -66,7 +66,7 @@ mod_wes_sig_ui <- function(id) {
                          value = FALSE),
     run_button(ns("run"), "Extract signatures", "提取突变特征")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Mutational signatures", zh = "突变特征"),
     subtitle  = list(en = "Decompose the mutation spectrum into known mutational processes.",
                      zh = "把突变谱分解为已知的突变过程。"),
@@ -270,52 +270,34 @@ mod_wes_sig_server <- function(id, rv, log_rv) {
                 s$n, res$db, txt, weak_zh, chk_zh, pc_zh))
     })
 
-    draw_sig <- with_text_boost(function() {
+    draw_sig <- function() {
       shiny::req(res$sig)
-      maftools::plotSignatures(nmfRes = res$sig, contributions = FALSE, title_size = 1.0,
-                               sig_db = res$db)
-    })
-    output$sig <- render_base_plot(draw_sig)
-    register_figure_download(output, input, "sig", draw_sig, "wes_signatures",
-                             width = 11, height = function() max(4, 2 + 1.6 * res$n))
+      wes_signatures_gg(res$sig, tryCatch(wes_sig_matches(res$cmp), error = function(e) NULL))
+    }
+    render_step_plot(output, input, "sig", draw_sig, name = "wes_signatures", width = 12,
+                     height = function() max(4, 1.8 + 1.9 * res$n))
 
-    draw_contrib <- with_text_boost(function() {
+    draw_contrib <- function() {
       shiny::req(res$sig)
-      maftools::plotSignatures(nmfRes = res$sig, contributions = TRUE)
-    })
-    output$contrib <- render_base_plot(draw_contrib)
-    register_figure_download(output, input, "contrib", draw_contrib, "wes_signature_exposures",
-                             width = 12, height = 6)
+      wes_exposures_gg(res$sig)
+    }
+    render_step_plot(output, input, "contrib", draw_contrib, name = "wes_signature_exposures",
+                     width = 12, height = 5.5)
 
-    draw_rank <- with_text_boost(function() {
+    draw_rank <- function() {
       shiny::req(res$sig)
       if (is.null(res$est)) {
         stop("The rank was not estimated in this run: tick 'Also estimate the number of signatures' and run again.")
       }
-      maftools::plotCophenetic(res = res$est$res, bestFit = res$n)
-    })
-    output$rank <- render_base_plot(draw_rank)
-    register_figure_download(output, input, "rank", draw_rank, "wes_signature_rank",
-                             width = 7, height = 5)
+      wes_cophenetic_gg(res$est$res, best = res$n)
+    }
+    render_step_plot(output, input, "rank", draw_rank, name = "wes_signature_rank", width = 7, height = 5)
 
-    draw_apo <- with_text_boost(function() {
+    draw_apo <- function() {
       shiny::req(res$tnm, rv$maf)
-      msg <- tryCatch({
-        maftools::plotApobecDiff(tnm = res$tnm, maf = rv$maf)
-        NULL
-      }, error = function(e) conditionMessage(e))
-      if (is.null(msg)) return(invisible(NULL))
-      if (grepl("None of the samples are enriched", msg, ignore.case = TRUE)) {
-        stop("No sample is APOBEC-enriched (one-sided Fisher test): that mutational process is essentially absent here — expected for many tumour types, e.g. leukaemia.")
-      }
-      if (grepl("differ(en|e)tially", msg, ignore.case = TRUE)) {
-        stop("Some samples are APOBEC-enriched, but no gene's mutation frequency differs between enriched and non-enriched samples, so there is nothing to draw.")
-      }
-      stop(msg)
-    })
-    output$apo <- render_base_plot(draw_apo)
-    register_figure_download(output, input, "apo", draw_apo, "wes_apobec",
-                             width = 10, height = 7)
+      wes_apobec_gg(res$tnm, rv$maf)
+    }
+    render_step_plot(output, input, "apo", draw_apo, name = "wes_apobec", width = 11, height = 8)
 
     view <- shiny::reactive({
       shiny::req(res$cmp)

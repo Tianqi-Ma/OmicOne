@@ -72,7 +72,7 @@ mod_normalize_ui <- function(id) {
     ),
     run_button(ns("run"), "Normalize", "归一化")
   )
-  step_container(title = list(en = "Normalization", zh = "归一化"),
+  step_container(id = id, title = list(en = "Normalization", zh = "归一化"),
                  subtitle = list(en = "Make cells sequenced to different depths comparable.",
                                  zh = "使测序深度不同的细胞可相互比较。"),
                  explainer = explainer, controls = controls,

@@ -59,15 +59,13 @@ default_group_col <- function(cols, cluster_col = NULL) {
   if (length(cols)) cols[1] else NULL
 }
 
-#' Levels of a metadata column, in factor order when it is a factor
+#' Levels of a metadata column, in the order figures show them
 #' @param md Cell metadata. @param col Column name.
-#' @return Character vector (empty when the column is missing).
+#' @return Character vector (empty when the column is missing); see [level_order()].
 #' @keywords internal
 group_levels <- function(md, col) {
   if (is.null(col) || !col %in% colnames(md)) return(character(0))
-  v <- md[[col]]
-  lv <- if (is.factor(v)) levels(droplevels(v)) else sort(unique(as.character(v)))
-  lv[!is.na(lv)]
+  level_order(md[[col]])
 }
 
 #' Coverage of gene sets in the genes of the object
@@ -665,7 +663,8 @@ sc_trajectory_plot <- function(srt, method, group_by, pt_cols, fate_cols = chara
   if (!require_pkgs("scop", "Trajectory plot")) return(NULL)
   red <- traj_display_reduction(srt)
   if (method == "slingshot") {
-    return(scop::CellDimPlot(srt, group.by = group_by, reduction = red,
+    pp <- scop_group_prep(srt, group_by)
+    return(scop::CellDimPlot(pp$srt, group.by = group_by, reduction = red, palcolor = pp$palcolor,
                              lineages = pt_cols, lineages_span = 0.1))
   }
   if (method %in% c("monocle2", "monocle3")) {
@@ -729,8 +728,9 @@ velocity_log_code <- function(group_by, mode) {
 #' @keywords internal
 sc_velocityplot <- function(srt, mode, group_by) {
   if (!require_pkgs("scop", "Velocity plot")) return(NULL)
-  scop::CellDimPlot(srt, group.by = group_by, reduction = "umap", velocity = mode,
-                    velocity_plot_type = "stream")
+  pp <- scop_group_prep(srt, group_by)
+  scop::CellDimPlot(pp$srt, group.by = group_by, reduction = "umap", velocity = mode,
+                    velocity_plot_type = "stream", palcolor = pp$palcolor)
 }
 
 # ---- Dynamic features ----------------------------------------------------------
@@ -1051,7 +1051,7 @@ cellcomm_count_plot <- function(tab) {
   ggplot2::ggplot(counts, ggplot2::aes(x = .data$target, y = .data$source, fill = .data$Freq)) +
     ggplot2::geom_tile(colour = "white") +
     ggplot2::geom_text(ggplot2::aes(label = .data$Freq), size = 3) +
-    ggplot2::scale_fill_gradient(low = "#eef3f8", high = "#3b6ea5",
+    ggplot2::scale_fill_gradient(low = "#eef3f8", high = style_tokens()$kept,
                                  name = "Significant\nLR pairs") +
     ggplot2::labs(x = "Receiver (target) group", y = "Sender (source) group",
                   title = "Number of significant ligand-receptor pairs") +
@@ -1205,61 +1205,39 @@ copykat_log_code <- function(ref_col = NULL, ref_groups = NULL, sample_col = NUL
 
 # ---- scop plotting wrappers ----------------------------------------------------
 
+#' A grouping prepared for a scop plot in the app's colours
+#'
+#' scop assigns `palcolor` to the levels in order, so the column is made a
+#' factor in [group_colors()] order (on a local copy) and the colours are
+#' passed in that order: a cluster has the same colour in a scop figure as in
+#' every other figure.
+#' @param srt Seurat object. @param group_by Grouping column.
+#' @return list(srt, palcolor).
+#' @keywords internal
+scop_group_prep <- function(srt, group_by) {
+  if (is.null(group_by) || !group_by %in% obj_meta_cols(srt)) return(list(srt = srt, palcolor = NULL))
+  cols <- group_colors(srt, group_by)
+  srt@meta.data[[group_by]] <- factor(as.character(srt@meta.data[[group_by]]), levels = names(cols))
+  list(srt = srt, palcolor = unname(cols))
+}
+
 #' Dimensional-reduction scatter (clusters / metadata), scop::CellDimPlot(),
 #' with optional mascarade outlines of the same grouping
 #' @param srt Seurat object. @param group_by Column to colour and outline by.
 #' @param reduction Reduction (NULL = scop's default).
-#' @param mask Draw mascarade outlines. @param palette,label Passed to scop.
+#' @param mask Draw mascarade outlines. @param label Passed to scop.
 #' @param ... Further CellDimPlot() arguments.
 #' @keywords internal
-sc_dimplot <- function(srt, group_by, reduction = NULL, mask = FALSE,
-                       palette = "Paired", label = TRUE, ...) {
+sc_dimplot <- function(srt, group_by, reduction = NULL, mask = FALSE, label = TRUE, ...) {
   if (!require_pkgs("scop", "Dimension plot")) return(NULL)
-  p <- scop::CellDimPlot(srt, group.by = group_by, reduction = reduction,
-                         palette = palette, label = label, ...)
+  pp <- scop_group_prep(srt, group_by)
+  p <- scop::CellDimPlot(pp$srt, group.by = group_by, reduction = reduction,
+                         palcolor = pp$palcolor, label = label, ...)
   if (isTRUE(mask) && has_pkg("mascarade")) {
     p <- tryCatch(add_mascarade(p, srt, group_by, reduction),
                   error = function(e) p)
   }
   p
-}
-
-#' Feature (gene / score) on a reduction, scop::FeatureDimPlot()
-#' @param srt Seurat object. @param features Features. @param reduction Reduction.
-#' @param ... Further FeatureDimPlot() arguments.
-#' @keywords internal
-sc_featureplot <- function(srt, features, reduction = NULL, ...) {
-  if (!require_pkgs("scop", "Feature plot")) return(NULL)
-  scop::FeatureDimPlot(srt, features = features, reduction = reduction, ...)
-}
-
-#' Grouped mean-expression heatmap, scop::GroupHeatmap()
-#' @param srt Seurat object. @param features Genes. @param group_by Grouping.
-#' @param ... Further GroupHeatmap() arguments.
-#' @keywords internal
-sc_groupheatmap <- function(srt, features, group_by, ...) {
-  if (!require_pkgs("scop", "GroupHeatmap")) return(NULL)
-  scop::GroupHeatmap(srt, features = features, group.by = group_by, ...)
-}
-
-#' Composition / statistics plot, scop::CellStatPlot()
-#' @param srt Seurat object. @param stat_by,group_by Columns.
-#' @param plot_type Plot type. @param ... Further arguments.
-#' @keywords internal
-sc_cellstat <- function(srt, stat_by, group_by = NULL, plot_type = "bar", ...) {
-  if (!require_pkgs("scop", "Cell statistics")) return(NULL)
-  scop::CellStatPlot(srt, stat.by = stat_by, group.by = group_by,
-                     plot_type = plot_type, ...)
-}
-
-#' Per-group feature distribution, scop::FeatureStatPlot()
-#' @param srt Seurat object. @param stat_by Features. @param group_by Grouping.
-#' @param plot_type Plot type. @param ... Further arguments.
-#' @keywords internal
-sc_featurestat <- function(srt, stat_by, group_by, plot_type = "violin", ...) {
-  if (!require_pkgs("scop", "Feature statistics")) return(NULL)
-  scop::FeatureStatPlot(srt, stat.by = stat_by, group.by = group_by,
-                        plot_type = plot_type, ...)
 }
 
 #' PAGA graph on an embedding, scop::PAGAPlot()
@@ -1302,6 +1280,6 @@ add_mascarade <- function(p, srt, group_by, reduction = NULL) {
   p + ggplot2::geom_path(
     data = mask,
     ggplot2::aes(x = .data$x, y = .data$y, group = .data$group),
-    colour = "grey20", linewidth = 0.4, inherit.aes = FALSE
+    colour = style_tokens()$ink, linewidth = 0.4, inherit.aes = FALSE
   )
 }

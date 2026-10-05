@@ -83,7 +83,7 @@ mod_malignancy_ui <- function(id) {
                         c("CNV calls" = "calls", "Stemness score" = "stem"),
                         selected = "calls", inline = TRUE)
   )
-  step_container(title = list(en = "Malignant cells / CNV", zh = "恶性细胞 / CNV"),
+  step_container(id = id, title = list(en = "Malignant cells / CNV", zh = "恶性细胞 / CNV"),
                  subtitle = list(en = "Separate malignant cells by inferred copy-number changes.",
                                  zh = "按推断的拷贝数变化区分恶性细胞。"),
                  explainer = explainer, controls = controls,
@@ -297,11 +297,11 @@ mod_malignancy_server <- function(id, rv, log_rv) {
       cols <- obj_meta_cols(obj)
       if (identical(input$show, "stem")) {
         shiny::req("stemness_UCell" %in% cols)
-        return(sc_featureplot(obj, features = "stemness_UCell"))
+        return(sc_feature_plot(obj, "stemness_UCell"))
       }
       shiny::req("malignant" %in% cols, isTRUE(res$cnv_done))
-      # show_na: cells copykat filtered or skipped stay visible as "no call"
-      sc_dimplot(obj, group_by = "malignant", show_na = TRUE)
+      # cells copykat filtered or skipped stay visible, in grey, as "no call"
+      sc_dim_plot(obj, group_by = "malignant", label = FALSE)
     }, name = "malignancy")
   })
 }

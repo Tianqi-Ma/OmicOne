@@ -63,7 +63,7 @@ mod_cellcomm_ui <- function(id) {
                     "* CellPhoneDB 和 NicheNet 需要额外设置（通常是 Python 环境），不在应用内运行。")),
     run_button(ns("run"), "Infer communication", "推断通讯")
   )
-  step_container(title = list(en = "Cell-cell communication", zh = "细胞间通讯"),
+  step_container(id = id, title = list(en = "Cell-cell communication", zh = "细胞间通讯"),
                  subtitle = list(en = "Ligand-receptor signalling between cell types.",
                                  zh = "细胞类型之间的配体-受体信号。"),
                  explainer = explainer, controls = controls,

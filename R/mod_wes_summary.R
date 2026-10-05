@@ -27,10 +27,9 @@ mod_wes_summary_ui <- function(id) {
       zh = "这是任何分析之前的合理性检查。如果每个样本都有上千个变异，通常意味着残留了胚系变异或假阳性。少数样本远高于其余样本则往往是真实生物学——POLE 突变或错配修复缺陷的肿瘤本就是超突变——在判定其为假阳性之前，请先看它们的突变特征。"),
     how  = list(
       en = "<b>Remove outliers</b> keeps one hypermutated sample from flattening
-            the boxplot (it only changes the drawing, not the data). Turn the
-            <b>dashboard</b> off for a plain stacked barplot of variant
-            classifications only.",
-      zh = "<b>剔除离群值</b>可避免某个超突变样本把箱线图压平（只影响绘图，不改动数据）。关闭<b>仪表盘</b>则只显示变异分类的堆叠柱状图。"),
+            the boxplot (it only changes the drawing, not the data). The line on
+            the per-sample panel marks the median or the mean.",
+      zh = "<b>剔除离群值</b>可避免某个超突变样本把箱线图压平（只影响绘图，不改动数据）。每样本面板上的线标出中位数或均值。"),
     read = list(
       en = "Six panels. Top row: which consequences (<i>Missense</i>,
             <i>Nonsense</i>…), variant types (SNP/INS/DEL) and base changes
@@ -59,11 +58,9 @@ mod_wes_summary_ui <- function(id) {
     shiny::checkboxInput(ns("rm_outlier"),
                          i18n("Remove outliers from the boxplot", "从箱线图中剔除离群值"),
                          value = TRUE),
-    shiny::checkboxInput(ns("dashboard"),
-                         i18n("Full dashboard", "完整仪表盘"), value = TRUE),
     run_button(ns("run"), "Draw summary", "绘制概览")
   )
-  step_container(
+  step_container(id = id, 
     title     = list(en = "Cohort summary", zh = "队列概览"),
     subtitle  = list(en = "The cohort at a glance: mutation types, per-sample burden, top genes.",
                      zh = "队列全景一瞥：突变类型、每样本负荷、高频基因。"),
@@ -92,15 +89,7 @@ mod_wes_summary_server <- function(id, rv, log_rv) {
     opts <- step_result(rv, "wes")
 
     draw_with <- function(maf, o) {
-      n_samples <- tryCatch(nrow(maftools::getSampleSummary(maf)),
-                            error = function(e) NA_integer_)
-      maftools::plotmafSummary(maf = maf, rmOutlier = o$rm_outlier,
-                               addStat = if (identical(o$stat, "none")) NULL else o$stat,
-                               dashboard = o$dashboard, titvRaw = FALSE,
-                               top = o$top,
-                               fs = adaptive_cex(n_samples, base = 1.2, n_ref = 200,
-                                                 lo = 1.0, hi = 1.25),
-                               textSize = 1.1, titleSize = c(1.25, 1.05))
+      wes_summary_gg(maf, top = o$top, stat = o$stat, rm_outlier = o$rm_outlier)
     }
 
     shiny::observeEvent(input$run, {
@@ -108,21 +97,19 @@ mod_wes_summary_server <- function(id, rv, log_rv) {
       if (!require_pkgs("maftools", "Cohort summary")) return(NULL)
       o <- list(top = wes_int(input$top, 10, lo = 3, hi = 30),
                 stat = input$stat %||% "median",
-                rm_outlier = isTRUE(input$rm_outlier),
-                dashboard = isTRUE(input$dashboard))
+                rm_outlier = isTRUE(input$rm_outlier))
       maf <- rv$maf
-      ok <- with_progress_notify(wes_dry_run(function() draw_with(maf, o)),
+      ok <- with_progress_notify(wes_dry_run(function() draw_plot_object(draw_with(maf, o))),
                                  message = "Drawing the cohort summary...")
       if (is.null(ok)) return(NULL)
       opts(o)
       mark_done(rv, "wes_summary")
       log_step(log_rv, "WES cohort summary",
-               params = list(top = o$top, addStat = o$stat, rmOutlier = o$rm_outlier,
-                             dashboard = o$dashboard),
+               params = list(top = o$top, addStat = o$stat, rmOutlier = o$rm_outlier),
                code = wes_code("maftools::plotmafSummary",
                                list(maf = quote(maf), rmOutlier = o$rm_outlier,
                                     addStat = if (identical(o$stat, "none")) NULL else o$stat,
-                                    dashboard = o$dashboard, titvRaw = FALSE, top = o$top)))
+                                    dashboard = TRUE, titvRaw = FALSE, top = o$top)))
     })
 
     stats <- shiny::reactive({
@@ -162,9 +149,8 @@ mod_wes_summary_server <- function(id, rv, log_rv) {
       shiny::req(rv$maf, o)
       draw_with(rv$maf, o)
     }
-    output$plot <- render_base_plot(draw_summary)
-    register_figure_download(output, input, "plot", draw_summary,
-                             "wes_cohort_summary", width = 12, height = 9)
+    render_step_plot(output, input, "plot", draw_summary, name = "wes_cohort_summary",
+                     width = 13, height = 8.5)
 
     gene_df <- shiny::reactive({
       shiny::req(rv$maf)
