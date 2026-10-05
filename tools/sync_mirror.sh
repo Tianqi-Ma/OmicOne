@@ -22,7 +22,8 @@ if [ ! -d "$SC/R" ]; then
   exit 2
 fi
 
-# Keep in step with tools/check_mirror.sh.
+# Keep in step with tools/check_mirror.sh. Every mod_wes_*.R / fct_wes*.R is
+# OmicOne-only as well (the WES pipeline), whether listed here or not.
 EXPECTED="app_landing.R app_server.R app_ui.R steps.R mod_placeholder.R
 mod_report.R fct_wes.R mod_wes_clin.R mod_wes_compare.R mod_wes_driver.R
 mod_wes_hetero.R mod_wes_import.R mod_wes_lolli.R mod_wes_onco.R mod_wes_sig.R
@@ -42,6 +43,7 @@ copy_one() {   # $1 = source file, $2 = destination file
 
 for f in "$OMIC"/R/*.R; do
   b=$(basename "$f")
+  case "$b" in mod_wes_*|fct_wes*) continue ;; esac      # the WES pipeline is OmicOne's own
   case " $(echo $EXPECTED) " in
     *" $b "*) continue ;;
   esac

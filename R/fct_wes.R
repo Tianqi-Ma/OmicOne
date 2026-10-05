@@ -488,6 +488,19 @@ wes_samples <- function(maf) {
   s[!is.na(s)]
 }
 
+#' Every sample with at least one record (non-synonymous or silent)
+#'
+#' Written to `rv$wes_sequenced` at import: the variant filters can leave a
+#' sample with no variant, and it must still count as sequenced (wild-type,
+#' TMB 0) rather than vanish.
+#' @param maf A MAF object.
+#' @keywords internal
+wes_all_samples <- function(maf) {
+  s <- unique(c(wes_samples(maf), as.character(maf@data$Tumor_Sample_Barcode),
+                as.character(maf@maf.silent$Tumor_Sample_Barcode)))
+  s[!is.na(s) & nzchar(s)]
+}
+
 #' Gene names in a MAF, most-mutated first
 #' @param maf A MAF object. @param n How many to return (Inf for all).
 #' @keywords internal
@@ -724,10 +737,12 @@ wes_harmonise_chr <- function(chrom, prefix) {
 #' @param capture_size Captured territory in Mb (ignored when `bed` is given).
 #' @param bed Optional merged BED (see [wes_read_bed()]).
 #' @param log_scale Passed to `tmb(logScale =)` (plotting only).
+#' @param samples Every sample known to be sequenced (`rv$wes_sequenced`): a
+#'   sample the variant filters left with no variant still counts, as 0.
 #' @return list(df = data.frame(Tumor_Sample_Barcode, total, total_perMB),
 #'   maf = the MAF the burden was counted on, capture =, n_zero =).
 #' @keywords internal
-wes_tmb <- function(maf, capture_size = NULL, bed = NULL, log_scale = TRUE) {
+wes_tmb <- function(maf, capture_size = NULL, bed = NULL, log_scale = TRUE, samples = NULL) {
   sub <- maf
   if (!is.null(bed)) {
     if (!wes_has_arg("subsetMaf", "ranges")) {
@@ -751,7 +766,7 @@ wes_tmb <- function(maf, capture_size = NULL, bed = NULL, log_scale = TRUE) {
   t <- as.data.frame(do.call(maftools::tmb, args))
   df <- data.frame(Tumor_Sample_Barcode = as.character(t$Tumor_Sample_Barcode),
                    total = as.numeric(t$total), stringsAsFactors = FALSE)
-  miss <- setdiff(wes_samples(maf), df$Tumor_Sample_Barcode)
+  miss <- setdiff(union(wes_samples(maf), samples), df$Tumor_Sample_Barcode)
   if (length(miss)) {
     df <- rbind(df, data.frame(Tumor_Sample_Barcode = miss, total = 0,
                                stringsAsFactors = FALSE))
@@ -1377,10 +1392,12 @@ wes_norm_id <- function(x, tcga12 = FALSE) {
 #' @param maf A MAF object. @param genes Character vector of gene symbols.
 #' @param universe Optional extra sample ids to return as WT when absent.
 #' @param tcga12 Join on 12-character TCGA patient barcodes.
+#' @param sequenced Samples of the imported MAF (`rv$wes_sequenced`): they stay
+#'   "in the MAF" even when the variant filters removed all their variants.
 #' @return data.frame: `.id` (normalised), `in_maf`, `mutated`, `status`.
 #' @keywords internal
-wes_mutation_status <- function(maf, genes, universe = NULL, tcga12 = FALSE) {
-  all_s <- wes_samples(maf)
+wes_mutation_status <- function(maf, genes, universe = NULL, tcga12 = FALSE, sequenced = NULL) {
+  all_s <- union(wes_samples(maf), sequenced)
   if (!length(all_s)) stop("No samples found in the MAF.")
   dat <- as.data.frame(maftools::subsetMaf(maf = maf, genes = genes, includeSyn = FALSE,
                                            mafObj = FALSE))

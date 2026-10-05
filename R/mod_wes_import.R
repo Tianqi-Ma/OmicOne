@@ -224,6 +224,7 @@ mod_wes_import_server <- function(id, rv, log_rv) {
       # a new cohort: forget every WES result computed on the previous one
       start_epoch(rv, "wes", log_rv)
       rv$maf <- maf
+      rv$wes_sequenced <- wes_all_samples(maf)
       rv$maf_source <- label
       if (!is.null(clin)) {
         attr(clin, "file") <- clin_name

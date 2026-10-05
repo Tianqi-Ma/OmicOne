@@ -40,36 +40,44 @@ all_step_registries <- function() {
 
 #' WES (maftools) steps — fully implemented
 #'
-#' Every step reads the imported MAF and nothing else from the pipeline, so
-#' each depends on `wes_import` only (the clinical table is loaded inside the
-#' steps that need it).
+#' Every analysis step reads the MAF as imported and, when it ran, filtered by
+#' Variant filters, so each depends on `wes_import` and `wes_filter` (the
+#' clinical table is loaded inside the steps that need it). The report reads
+#' only the log.
 #' @keywords internal
 steps_wes <- function() {
+  d <- c("wes_import", "wes_filter")
   list(
     list(v = "wes_import", n = 1,  phase = "wes_io",   en = "Import MAF",        zh = "导入 MAF",      ui = mod_wes_import_ui,
          deps = character(0)),
-    list(v = "wes_summary",n = 2,  phase = "wes_io",   en = "Cohort summary",    zh = "队列概览",      ui = mod_wes_summary_ui,
+    list(v = "wes_filter", n = 2,  phase = "wes_io",   en = "Variant filters",   zh = "变异过滤",      ui = mod_wes_filter_ui,
          deps = "wes_import"),
-    list(v = "wes_onco",   n = 3,  phase = "wes_land", en = "Oncoplot",          zh = "Oncoplot",      ui = mod_wes_onco_ui,
-         deps = "wes_import"),
-    list(v = "wes_titv",   n = 4,  phase = "wes_land", en = "TiTv / VAF / rainfall", zh = "TiTv/VAF/rainfall", ui = mod_wes_titv_ui,
-         deps = "wes_import"),
-    list(v = "wes_tmb",    n = 5,  phase = "wes_land", en = "TMB",               zh = "突变负荷 TMB",  ui = mod_wes_tmb_ui,
-         deps = "wes_import"),
-    list(v = "wes_lolli",  n = 6,  phase = "wes_land", en = "Lollipop / domains",zh = "Lollipop/结构域", ui = mod_wes_lolli_ui,
-         deps = "wes_import"),
-    list(v = "wes_driver", n = 7,  phase = "wes_land", en = "Drivers & interactions", zh = "驱动基因与互作", ui = mod_wes_driver_ui,
-         deps = "wes_import"),
-    list(v = "wes_sig",    n = 8,  phase = "wes_sig",  en = "Mutational signatures", zh = "突变特征",  ui = mod_wes_sig_ui,
-         deps = "wes_import"),
-    list(v = "wes_clin",   n = 9,  phase = "wes_prog", en = "Clinical / pathway / drug", zh = "临床/通路/药物", ui = mod_wes_clin_ui,
-         deps = "wes_import"),
-    list(v = "wes_compare",n = 10, phase = "wes_prog", en = "Cohort comparison", zh = "队列比较",      ui = mod_wes_compare_ui,
-         deps = "wes_import"),
-    list(v = "wes_surv",   n = 11, phase = "wes_prog", en = "Mutation vs survival", zh = "突变-预后",  ui = mod_wes_surv_ui,
-         deps = "wes_import"),
-    list(v = "wes_hetero", n = 12, phase = "wes_prog", en = "Heterogeneity",     zh = "异质性",        ui = mod_wes_hetero_ui,
-         deps = "wes_import")
+    list(v = "wes_summary",n = 3,  phase = "wes_io",   en = "Cohort summary",    zh = "队列概览",      ui = mod_wes_summary_ui,
+         deps = d),
+    list(v = "wes_onco",   n = 4,  phase = "wes_land", en = "Oncoplot",          zh = "Oncoplot",      ui = mod_wes_onco_ui,
+         deps = d),
+    list(v = "wes_titv",   n = 5,  phase = "wes_land", en = "TiTv / VAF / rainfall", zh = "TiTv/VAF/rainfall", ui = mod_wes_titv_ui,
+         deps = d),
+    list(v = "wes_tmb",    n = 6,  phase = "wes_land", en = "TMB",               zh = "突变负荷 TMB",  ui = mod_wes_tmb_ui,
+         deps = d),
+    list(v = "wes_lolli",  n = 7,  phase = "wes_land", en = "Lollipop / domains",zh = "Lollipop/结构域", ui = mod_wes_lolli_ui,
+         deps = d),
+    list(v = "wes_driver", n = 8,  phase = "wes_land", en = "Drivers & interactions", zh = "驱动基因与互作", ui = mod_wes_driver_ui,
+         deps = d),
+    list(v = "wes_sig",    n = 9,  phase = "wes_sig",  en = "Mutational signatures", zh = "突变特征",  ui = mod_wes_sig_ui,
+         deps = d),
+    list(v = "wes_clin",   n = 10, phase = "wes_prog", en = "Clinical / pathway / drug", zh = "临床/通路/药物", ui = mod_wes_clin_ui,
+         deps = d),
+    list(v = "wes_compare",n = 11, phase = "wes_prog", en = "Cohort comparison", zh = "队列比较",      ui = mod_wes_compare_ui,
+         deps = d),
+    list(v = "wes_surv",   n = 12, phase = "wes_prog", en = "Mutation vs survival", zh = "突变-预后",  ui = mod_wes_surv_ui,
+         deps = d),
+    list(v = "wes_tmbclin",n = 13, phase = "wes_prog", en = "TMB vs outcome",    zh = "TMB 与临床结局", ui = mod_wes_tmbclin_ui,
+         deps = d),
+    list(v = "wes_hetero", n = 14, phase = "wes_prog", en = "Heterogeneity",     zh = "异质性",        ui = mod_wes_hetero_ui,
+         deps = d),
+    list(v = "wes_report", n = 15, phase = "wes_out",  en = "Report",            zh = "报告",          ui = mod_wes_report_ui,
+         deps = character(0))
   )
 }
 
@@ -128,6 +136,7 @@ app_phases <- function() {
     wes_land = list(en = "Landscape", zh = "突变全景"),
     wes_sig = list(en = "Signatures", zh = "突变特征"),
     wes_prog = list(en = "Clinical & prognosis", zh = "临床与预后"),
+    wes_out = list(en = "Output", zh = "产出"),
     # bulk
     bulk_io = list(en = "Input & QC", zh = "输入与质控"),
     bulk_de = list(en = "Differential expression", zh = "差异表达"),

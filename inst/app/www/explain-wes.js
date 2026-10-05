@@ -525,4 +525,151 @@
       g.note("The clonal peak sits near purity / 2, not at 0.5", "克隆峰位于纯度 / 2 附近，而不是 0.5", cl);
     }
   });
+  // ---- variant filters ----------------------------------------------------------
+  X.register("wes_filter", {
+    period: 10,
+    stages: [[0, 2.6, "Every call from the caller enters", "检测工具给出的每个突变都进入过滤"],
+             [2.6, 6.6, "Each filter drops what it cannot trust", "每一道过滤去掉不可信的突变"],
+             [6.6, 10, "Report what each filter removed", "报告每一道过滤去掉了多少"]],
+    still: 9,
+    init: function (R) {
+      var fails = [0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 3, 3], calls = [];
+      for (var i = 0; i < 40; i++) {
+        calls.push({ y: 74 + R() * 92, d: R() * 1.6, vc: vcPick(R),
+                     fail: i < fails.length ? fails[i] : -1, drop: 20 + R() * 30 });
+      }
+      calls.sort(function (a, b) { return a.d - b.d; });
+      return { calls: calls, gates: [170, 260, 350, 440] };
+    },
+    draw: function (g, s, t) {
+      var th = g.th, G = s.gates, lab = [["PASS", "PASS"], ["depth ≥ 10", "深度 ≥ 10"], ["VAF ≥ 5%", "VAF ≥ 5%"],
+                                         ["gnomAD ≤ 0.1%", "gnomAD ≤ 0.1%"]];
+      var summ = seg(t, 6.6, 7.4);
+      G.forEach(function (x, k) {
+        var a = seg(t, 0.3 + k * 0.25, 0.9 + k * 0.25) * (1 - summ * 0.6);
+        g.line(x, 62, x, 176, th.accent, 2, a, [4, 4]);
+        g.text(L(lab[k][0], lab[k][1]), x, 52, { col: th.accent2, size: 10, bold: true, align: "center", a: a });
+      });
+      var removed = [0, 0, 0, 0], kept = 0;
+      s.calls.forEach(function (c) {
+        var p = seg(t, 0.6 + c.d, 5.6 + c.d, false), x = lerp(40, 530, p);
+        if (c.fail >= 0 && x >= G[c.fail]) {
+          var q = H.clamp((x - G[c.fail]) / 40, 0, 1);
+          removed[c.fail]++;
+          g.dot(G[c.fail] + 6, c.y + q * c.drop, 3.2, H.FLAG, (1 - q * 0.75) * (1 - summ));
+          return;
+        }
+        if (p >= 1) kept++;
+        g.dot(x, c.y, 3.2, VC[c.vc], 0.9 * (1 - summ));
+      });
+      G.forEach(function (x, k) {
+        if (removed[k]) g.text("−" + removed[k], x + 12, 196, { col: H.FLAG, size: 11, bold: true, a: 1 - summ });
+      });
+      if (summ > 0) {
+        var left = [40, 37, 33, 30, 28], xs = [80, 215, 305, 395, 485], base = 236;
+        left.forEach(function (n, k) {
+          var hh = n / 40 * 150 * seg(t, 6.8 + k * 0.15, 7.6 + k * 0.15);
+          g.rect(xs[k] - 16, base - hh, 32, hh, k === 4 ? th.ok : th.accent, 0.85, 3);
+          g.text(String(n), xs[k], base - hh - 9, { col: th.text, size: 10.5, bold: true, align: "center", a: summ });
+        });
+        g.t("in", "输入", xs[0], 249, { col: th.muted, size: 9.5, align: "center", a: summ });
+        g.t("kept", "保留", xs[4], 249, { col: th.ok, size: 9.5, bold: true, align: "center", a: summ });
+      }
+    }
+  });
+
+  // ---- TMB vs outcome -----------------------------------------------------------
+  X.register("wes_tmbclin", {
+    period: 10,
+    stages: [[0, 3, "Each patient's TMB, on a log scale", "每位患者的 TMB，对数坐标"],
+             [3, 6.4, "Split by outcome: does TMB shift?", "按结局分开：TMB 是否偏移？"],
+             [6.4, 10, "One number per doubling, plus the ROC curve", "以每翻一倍衡量，再看 ROC 曲线"]],
+    still: 9,
+    init: function (R) {
+      var pts = [];
+      for (var i = 0; i < 46; i++) {
+        var resp = R() < 0.4, v = H.gauss(R) * 0.75 + (resp ? 0.5 : -0.1);
+        pts.push({ v: v, resp: resp, j: H.gauss(R) });
+      }
+      var pos = pts.filter(function (p) { return p.resp; }), neg = pts.filter(function (p) { return !p.resp; });
+      var thr = pts.map(function (p) { return p.v; }).sort(function (a, b) { return b - a; }), roc = [[0, 0]];
+      thr.forEach(function (c) {
+        roc.push([neg.filter(function (p) { return p.v >= c; }).length / neg.length,
+                  pos.filter(function (p) { return p.v >= c; }).length / pos.length]);
+      });
+      return { pts: pts, roc: roc };
+    },
+    draw: function (g, s, t) {
+      var th = g.th, x0 = 50, x1 = 330, sp = seg(t, 3.2, 4.4), roc = seg(t, 6.6, 8.6, false);
+      var xs = function (v) { return lerp(x0, x1, H.clamp((v + 2) / 4, 0, 1)); };
+      var a0 = seg(t, 0.2, 1.2);
+      g.line(x0, 214, x1, 214, th.muted, 1, a0 * 0.8);
+      [["0.1", -1.6], ["1", 0], ["10", 1.6]].forEach(function (tk) {
+        g.text(tk[0], lerp(x0, x1, (tk[1] + 2) / 4), 226, { col: th.muted, size: 9.5, align: "center", a: a0 });
+      });
+      g.t("TMB (mut/Mb, log)", "TMB（mut/Mb，对数）", (x0 + x1) / 2, 242, { col: th.muted, size: 10, align: "center", a: a0 });
+      var ym = [0, 0], nm = [0, 0];
+      s.pts.forEach(function (p, i) {
+        var y = lerp(140 + p.j * 18, (p.resp ? 92 : 172) + p.j * 9, sp);
+        var col = sp > 0 ? H.mix("#8a96a3", p.resp ? th.accent : "#8a96a3", sp) : th.accent;
+        g.dot(xs(p.v), y, 3.3, col, seg(t, 0.3 + i * 0.03, 0.9 + i * 0.03) * 0.85);
+        ym[p.resp ? 1 : 0] += p.v; nm[p.resp ? 1 : 0]++;
+      });
+      if (sp > 0) {
+        g.t("responders", "应答", x0, 66, { col: th.accent2, size: 10, bold: true, a: sp });
+        g.t("others", "其他", x0, 196, { col: th.muted, size: 10, bold: true, a: sp });
+        [[1, 92], [0, 172]].forEach(function (r) {
+          var mx = xs(ym[r[0]] / nm[r[0]]);
+          g.line(mx, r[1] - 22, mx, r[1] + 22, r[0] ? th.accent : th.muted, 2.2, seg(t, 4.6, 5.4));
+        });
+      }
+      if (roc > 0) {
+        var rx = 380, ry = 222, rw = 150, rh = 150, pts = [];
+        g.axes(rx, ry, rw, rh, L("1 − specificity", "1 − 特异度"), L("sensitivity", "灵敏度"), seg(t, 6.4, 7));
+        g.line(rx, ry, rx + rw, ry - rh, th.faint, 1.2, seg(t, 6.4, 7), [4, 4]);
+        var k = Math.max(1, Math.round(roc * (s.roc.length - 1)));
+        for (var i = 0; i <= k; i++) pts.push([rx + s.roc[i][0] * rw, ry - s.roc[i][1] * rh]);
+        g.poly(pts, th.accent, 2.2, 1);
+        g.t("OR per doubling, AUC", "每翻一倍的 OR、AUC", rx + rw, 48, { col: th.accent2, size: 10.5, bold: true, align: "right", a: seg(t, 8.4, 9) });
+      }
+    }
+  });
+
+  // ---- WES report -----------------------------------------------------------------
+  X.register("wes_report", {
+    period: 8.5,
+    stages: [[0, 2.8, "Every WES step you ran is logged", "你运行的每个 WES 步骤都被记录"],
+             [2.8, 5.8, "Parameters and code are written up", "参数与代码被整理成文"],
+             [5.8, 8.5, "Download the report and the R script", "下载报告与 R 脚本"]],
+    still: 7.2,
+    init: function (R) {
+      var lines = [];
+      for (var i = 0; i < 9; i++) lines.push(0.5 + R() * 0.45);
+      return { lines: lines };
+    },
+    draw: function (g, s, t) {
+      var th = g.th, dx = 210, dy = 40, dw = 170, dh = 196;
+      ["Import", "Filters", "Oncoplot", "TMB", "Survival"].forEach(function (st, i) {
+        var p = seg(t, 0.3 + i * 0.4, 1.1 + i * 0.4);
+        g.chip(st, lerp(80, dx + 20, seg(t, 2.6 + i * 0.12, 3.2 + i * 0.12)), 70 + i * 30,
+               PAL[i], p * (1 - seg(t, 2.8 + i * 0.12, 3.3 + i * 0.12)), { size: 10, align: "left" });
+      });
+      var da = seg(t, 2.6, 3.2);
+      g.rect(dx, dy, dw, dh, th.card, da, 6);
+      g.box(dx, dy, dw, dh, th.border, 1.2, da, 6);
+      g.rect(dx + 14, dy + 14, 90, 8, th.ink, da * 0.8, 3);
+      [["Methods", "方法"], ["Parameters", "参数"], ["Code", "代码"]].forEach(function (hd, k) {
+        var y = dy + 42 + k * 50, p = seg(t, 3.2 + k * 0.7, 3.8 + k * 0.7);
+        g.text(L(hd[0], hd[1]), dx + 14, y, { col: th.accent2, size: 10, bold: true, a: p });
+        for (var j = 0; j < 2; j++) {
+          var w = (dw - 28) * s.lines[k * 3 + j] * seg(t, 3.4 + k * 0.7 + j * 0.2, 4 + k * 0.7 + j * 0.2, false);
+          g.rect(dx + 14, y + 12 + j * 10, w, 4, k === 2 ? th.ok : th.faint, 0.9, 2);
+        }
+      });
+      var dl = seg(t, 6, 6.8);
+      g.chip("report.html", 460, 110, th.accent, dl, { size: 10.5 });
+      g.chip("analysis.R", 460, 145, th.ok, dl, { size: 10.5 });
+      g.arrow(dx + dw + 8, 128, dx + dw + 8 + 30 * dl, 128, th.accent, 2, dl);
+    }
+  });
 })();

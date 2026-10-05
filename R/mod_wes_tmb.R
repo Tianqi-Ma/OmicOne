@@ -122,7 +122,7 @@ mod_wes_tmb_server <- function(id, rv, log_rv) {
         return(NULL)
       }
       out <- with_progress_notify(
-        wes_tmb(rv$maf, capture_size = cap, bed = bed, log_scale = log_scale),
+        wes_tmb(rv$maf, capture_size = cap, bed = bed, log_scale = log_scale, samples = rv$wes_sequenced),
         message = "Computing TMB...")
       if (is.null(out)) return(NULL)
       res$out <- out

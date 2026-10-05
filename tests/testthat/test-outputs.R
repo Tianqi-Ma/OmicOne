@@ -98,6 +98,7 @@ sc_module_servers <- function() {
 wes_module_servers <- function() {
   list(
     wes_import  = mod_wes_import_server,
+    wes_filter  = mod_wes_filter_server,
     wes_summary = mod_wes_summary_server,
     wes_onco    = mod_wes_onco_server,
     wes_titv    = mod_wes_titv_server,
@@ -108,7 +109,9 @@ wes_module_servers <- function() {
     wes_clin    = mod_wes_clin_server,
     wes_compare = mod_wes_compare_server,
     wes_surv    = mod_wes_surv_server,
-    wes_hetero  = mod_wes_hetero_server
+    wes_tmbclin = mod_wes_tmbclin_server,
+    wes_hetero  = mod_wes_hetero_server,
+    wes_report  = mod_wes_report_server
   )
 }
 

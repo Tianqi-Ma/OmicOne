@@ -1,5 +1,34 @@
 # OmicOne 0.6.1 (unreleased) — audit 2026-10
 
+## New analysis steps (feature/analysis-modules)
+
+- **Pseudobulk DE** (new phase *Compare conditions*): counts of each cell type
+  summed per sample, tested across samples with edgeR quasi-likelihood
+  (default), limma-voom or DESeq2; optional pairing / batch covariate; FDR
+  within each cell type; cell types with < 2 samples per group are skipped and
+  listed. Overview, volcano, per-sample cell counts, full table.
+- **Differential abundance**: cell-type proportions per sample, propeller method
+  (logit + limma robust eBayes; t test for two conditions, F test for more; BH)
+  written with limma, so speckle is not needed.
+- Both steps share the sample / condition / cell-type selectors and accept a
+  **sample sheet** (CSV/TSV, one row per sample) to add a condition the object
+  lacks; a condition that varies within a sample is refused.
+- Runnable log code for both, tested to reproduce the app's p-values;
+  explainer animations; a "Condition comparisons" report section.
+- **WES variant filters** (new step 2): FILTER = PASS, tumour depth, alt reads,
+  VAF (percent columns rescaled), population AF (gnomAD / ExAC / 1000G), normal
+  alt reads; a filter whose column the MAF lacks is skipped and reported; empty
+  values are kept; a funnel of what each filter removed; hypermutated samples
+  flagged (Tukey far-out fence on log10 counts), never silently dropped. Always
+  re-runs from the imported MAF. Samples the filters empty stay sequenced
+  (`rv$wes_sequenced`): wild-type in survival, TMB 0.
+- **TMB vs outcome**: Cox HR (with cox.zph) or logistic OR per doubling of TMB,
+  ROC AUC with a DeLong (pROC) or Hanley-McNeil CI and a rank-sum test for a
+  binary response; the median-split Kaplan-Meier is labelled an illustration.
+- **WES report** step: the report module limited to the WES log, plus the
+  runnable R script.
+
+
 ## Added
 - **Step animations.** Every step's empty preview plays a short looping scene of
   what the step does (QC outliers being flagged, a PCA cloud flattening onto its
@@ -25,7 +54,7 @@
 - `AGENTS.md` / `CLAUDE.md`: the design contract every model follows;
   `tools/sync_mirror.sh` keeps the two repositories identical where they share
   code.
-- `docs/explain-gallery.html`: all 33 animations on one page.
+- `docs/explain-gallery.html`: every step animation on one page.
 
 ## Changed
 - The app follows the OS light/dark preference; the language choice is remembered

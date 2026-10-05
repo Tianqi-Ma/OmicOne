@@ -58,11 +58,13 @@
          ["cellcycle", "Cell cycle & signatures", "周期与信号"], ["cellcomm", "Cell communication", "细胞通讯"],
          ["malignancy", "Malignant / CNV", "恶性/CNV"], ["clinical", "Clinical & survival", "临床与生存"],
          ["viz", "Visualize", "可视化"], ["report", "Report", "报告"], ["export", "Export", "导出"]],
-    wes: [["wes_import", "Import MAF", "导入 MAF"], ["wes_summary", "Cohort summary", "队列概览"], ["wes_onco", "Oncoplot", "Oncoplot"],
+    wes: [["wes_import", "Import MAF", "导入 MAF"], ["wes_filter", "Variant filters", "变异过滤"],
+          ["wes_summary", "Cohort summary", "队列概览"], ["wes_onco", "Oncoplot", "Oncoplot"],
           ["wes_titv", "TiTv / VAF", "TiTv / VAF"], ["wes_tmb", "TMB", "突变负荷 TMB"], ["wes_lolli", "Lollipop / domains", "Lollipop/结构域"],
           ["wes_driver", "Drivers & interactions", "驱动基因与互作"], ["wes_sig", "Mutational signatures", "突变特征"],
           ["wes_clin", "Clinical / pathway / drug", "临床/通路/药物"], ["wes_compare", "Cohort comparison", "队列比较"],
-          ["wes_surv", "Mutation vs survival", "突变-预后"], ["wes_hetero", "Heterogeneity", "异质性"]]
+          ["wes_surv", "Mutation vs survival", "突变-预后"], ["wes_tmbclin", "TMB vs outcome", "TMB 与临床结局"],
+          ["wes_hetero", "Heterogeneity", "异质性"], ["wes_report", "Report", "报告"]]
   };
   function build() {
     ["sc", "wes"].forEach(function (om) {

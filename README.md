@@ -160,22 +160,25 @@ scDblFinder, Leiden, Harmony, scop/SCP plotting throughout.
 
 ## The WES steps
 
-Four phases, twelve steps, all over maftools.
+Five phases, fifteen steps, all over maftools.
 
 | Phase | # | Step | What it does |
 |---|---|------|-----------------|
 | **Input** | 1 | Import MAF | MAF (+ optional clinical table), or the bundled TCGA LAML demo |
-| | 2 | Cohort summary | variant classes, per-sample burden, top mutated genes |
-| **Landscape** | 3 | Oncoplot | the waterfall view, with clinical annotation bars |
-| | 4 | TiTv / VAF / rainfall | mutation spectrum, allele frequencies, kataegis |
-| | 5 | TMB | mutations per Mb, per sample, over your capture size |
-| | 6 | Lollipop / domains | one gene's mutations along the protein, over its domains |
-| | 7 | Drivers & interactions | oncodrive positional clustering; co-occurrence / mutual exclusivity |
-| **Signatures** | 8 | Mutational signatures | trinucleotide matrix → de-novo signatures → COSMIC match |
-| **Clinical & prognosis** | 9 | Clinical / pathway / drug | gene enrichment by clinical group, oncogenic pathways, drug-gene interactions |
-| | 10 | Cohort comparison | Fisher test between two clinical groups, forest plot |
-| | 11 | Mutation vs survival | mutant vs WT Kaplan-Meier + log-rank, via the **shared** survival layer |
-| | 12 | Heterogeneity | VAF clustering per sample, MATH score |
+| | 2 | Variant filters | FILTER = PASS, tumour depth, alt reads, VAF, population AF (gnomAD / ExAC), normal alt reads — a funnel of what each removed; hypermutator flag (optional step) |
+| | 3 | Cohort summary | variant classes, per-sample burden, top mutated genes |
+| **Landscape** | 4 | Oncoplot | the waterfall view, with clinical annotation bars |
+| | 5 | TiTv / VAF / rainfall | mutation spectrum, allele frequencies, kataegis |
+| | 6 | TMB | mutations per Mb, per sample, over your capture size |
+| | 7 | Lollipop / domains | one gene's mutations along the protein, over its domains |
+| | 8 | Drivers & interactions | oncodrive positional clustering; co-occurrence / mutual exclusivity |
+| **Signatures** | 9 | Mutational signatures | trinucleotide matrix → de-novo signatures → COSMIC match |
+| **Clinical & prognosis** | 10 | Clinical / pathway / drug | gene enrichment by clinical group, oncogenic pathways, drug-gene interactions |
+| | 11 | Cohort comparison | Fisher test between two clinical groups, forest plot |
+| | 12 | Mutation vs survival | mutant vs WT Kaplan-Meier + log-rank, via the **shared** survival layer |
+| | 13 | TMB vs outcome | Cox HR or logistic OR per doubling of TMB (no cut-off), ROC AUC for a response; median-split KM as illustration |
+| | 14 | Heterogeneity | VAF clustering per sample, MATH score |
+| **Output** | 15 | Report | HTML report of the WES steps + the runnable R script |
 
 Step 1 offers maftools' bundled **TCGA LAML** cohort (193 samples), so the whole
 pipeline is explorable offline with no data of your own.

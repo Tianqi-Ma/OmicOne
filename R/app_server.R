@@ -18,7 +18,7 @@ app_server <- function(input, output, session) {
   rv <- shiny::reactiveValues(
     omics = NULL, status = list(),
     obj = NULL, source = NULL,          # single-cell
-    maf = NULL, maf_source = NULL,      # WES
+    maf = NULL, maf_source = NULL, wes_sequenced = NULL,   # WES
     wes_clin_raw = NULL,                # clinical table as read with the MAF
     clinical = NULL,                    # shared across omics
     epoch_sc = 0L, epoch_wes = 0L,
@@ -192,6 +192,7 @@ app_server <- function(input, output, session) {
 
   # --- WES module servers (fully implemented) --------------------------------
   mod_wes_import_server("wes_import", rv, log_rv)
+  mod_wes_filter_server("wes_filter", rv, log_rv)
   mod_wes_summary_server("wes_summary", rv, log_rv)
   mod_wes_onco_server("wes_onco", rv, log_rv)
   mod_wes_titv_server("wes_titv", rv, log_rv)
@@ -202,7 +203,9 @@ app_server <- function(input, output, session) {
   mod_wes_clin_server("wes_clin", rv, log_rv)
   mod_wes_compare_server("wes_compare", rv, log_rv)
   mod_wes_surv_server("wes_surv", rv, log_rv)
+  mod_wes_tmbclin_server("wes_tmbclin", rv, log_rv)
   mod_wes_hetero_server("wes_hetero", rv, log_rv)
+  mod_wes_report_server("wes_report", rv, log_rv)
 
   # --- Placeholder servers for the still-planned omics -----------------------
   ph_ids <- unlist(lapply(c("bulk", "spatial", "integration"),

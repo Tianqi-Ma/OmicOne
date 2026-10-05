@@ -79,6 +79,7 @@ Suggests:
     BSgenome.Hsapiens.UCSC.hg19,
     BSgenome.Hsapiens.UCSC.hg38,
     maxstat,
+    pROC,
     ComplexHeatmap,
     patchwork (>= 1.2.0),
     plotly,

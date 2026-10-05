@@ -40,6 +40,20 @@ report_sections <- function() {
   )
 }
 
+#' Report sections of the WES report step
+#' @keywords internal
+report_sections_wes <- function() {
+  list(
+    wes_input  = list(en = "Import & variant filters", zh = "导入与变异过滤",
+                      keys = c("wes_import", "wes_filter", "wes_summary")),
+    wes_land   = list(en = "Mutational landscape", zh = "突变全景",
+                      keys = c("wes_onco", "wes_titv", "wes_tmb", "wes_lolli", "wes_driver")),
+    wes_sig    = list(en = "Mutational signatures", zh = "突变特征", keys = "wes_sig"),
+    wes_prog   = list(en = "Clinical & prognosis", zh = "临床与预后",
+                      keys = c("wes_clin", "wes_compare", "wes_surv", "wes_tmbclin", "wes_hetero"))
+  )
+}
+
 #' Keep the log entries of the ticked report sections
 #'
 #' An entry whose step key belongs to no section (or that has no key) is
@@ -60,9 +74,10 @@ report_filter_entries <- function(entries, sections, defs = report_sections()) {
 
 #' @rdname mod_report
 #' @keywords internal
-mod_report_ui <- function(id) {
+mod_report_ui <- function(id, omics = "sc") {
   ns <- shiny::NS(id)
-  secs <- report_sections()
+  wes <- identical(omics, "wes")
+  secs <- if (wes) report_sections_wes() else report_sections()
   explainer <- explainer_card(
     title = list(en = "Export report", zh = "导出报告"),
     what = list(
@@ -91,7 +106,7 @@ mod_report_ui <- function(id) {
   controls <- shiny::tagList(
     label_with_help("Report title", "Shown as the report heading.",
                     label_zh = "报告标题", tip_zh = "作为报告的标题显示。"),
-    shiny::textInput(ns("title"), NULL, value = "OmicOne analysis report"),
+    shiny::textInput(ns("title"), NULL, value = if (wes) "OmicOne WES analysis report" else "OmicOne analysis report"),
     label_with_help("Sections to include",
                     "Only the ticked sections are written (matched by the key of the steps you ran).",
                     label_zh = "包含的章节",
@@ -102,7 +117,10 @@ mod_report_ui <- function(id) {
       choiceValues = names(secs),
       selected = names(secs)),
     shiny::downloadButton(ns("download_report"),
-                          i18n("Download report", "下载报告"), class = "w-100")
+                          i18n("Download report", "下载报告"), class = "w-100"),
+    if (wes) shiny::div(style = "margin-top:.5rem",
+      shiny::downloadButton(ns("download_script"),
+                            i18n("Download R script", "下载 R 脚本"), class = "w-100 btn-outline-secondary"))
   )
   step_container(
     title     = list(en = "Export report", zh = "导出报告"),
@@ -115,12 +133,18 @@ mod_report_ui <- function(id) {
 
 #' @rdname mod_report
 #' @keywords internal
-mod_report_server <- function(id, rv, log_rv) {
+mod_report_server <- function(id, rv, log_rv, omics = "sc") {
   shiny::moduleServer(id, function(input, output, session) {
+    wes <- identical(omics, "wes")
 
-    # Single-cell steps, plus the WES steps when that section is ticked.
+    # Single-cell steps, plus the WES steps when that section is ticked; the
+    # WES report step reports the WES pipeline only.
     report_entries <- shiny::reactive({
       all <- log_rv()
+      if (wes) {
+        return(report_filter_entries(log_entries_for(all, "wes"), input$sections %||% character(0),
+                                     defs = report_sections_wes()))
+      }
       entries <- c(log_entries_for(all, "sc"), log_entries_for(all, "wes"))
       report_filter_entries(entries, input$sections %||% character(0))
     })
@@ -228,7 +252,7 @@ mod_report_server <- function(id, rv, log_rv) {
     })
 
     output$preview <- shiny::renderUI({
-      explain_scene("report",
+      explain_scene(if (wes) "wes_report" else "report",
                     paste0("No plot for this step. Tick the sections to include, ",
                              "set a title, then click Download report to save an HTML ",
                              "record of the steps you ran, their parameters, code and ",
@@ -262,8 +286,14 @@ mod_report_server <- function(id, rv, log_rv) {
         if (!rendered) {
           writeLines(build_html(title, entries), file)
         }
-        mark_done(rv, "report")
+        mark_done(rv, if (wes) "wes_report" else "report")
       }
     )
+
+    if (wes) {
+      output$download_script <- shiny::downloadHandler(
+        filename = function() paste0("omicone_wes_script_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".R"),
+        content = function(file) writeLines(export_script_text(log_entries_for(log_rv(), "wes")), file))
+    }
   })
 }

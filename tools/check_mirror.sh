@@ -19,7 +19,8 @@ if [ ! -d "$SC/R" ]; then
   exit 2
 fi
 
-# Files that are allowed to differ, or to exist in one repo only.
+# Files that are allowed to differ, or to exist in one repo only (plus every
+# mod_wes_*.R / fct_wes*.R: the WES pipeline is OmicOne's own).
 EXPECTED="app_landing.R app_server.R app_ui.R steps.R mod_placeholder.R
 mod_report.R fct_wes.R mod_wes_clin.R mod_wes_compare.R mod_wes_driver.R
 mod_wes_hetero.R mod_wes_import.R mod_wes_lolli.R mod_wes_onco.R mod_wes_sig.R
@@ -39,6 +40,7 @@ for f in "$SC"/R/*.R;   do normalise "$f" > "$tmp/s/$(basename "$f")"; done
 status=0
 diff -rq "$tmp/o" "$tmp/s" 2>/dev/null | while read -r line; do
   file=$(printf '%s' "$line" | sed 's/.*[ /]\([A-Za-z0-9_.]*\.R\).*/\1/')
+  case "$file" in mod_wes_*|fct_wes*) continue ;; esac   # the WES pipeline is OmicOne's own
   case " $(echo $EXPECTED) " in
     *" $file "*) ;;
     *) echo "UNEXPECTED DIVERGENCE: $file" ;;

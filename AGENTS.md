@@ -108,7 +108,8 @@ list(v = "normalize", n = 4, phase = "sc_prep", en = "Normalize", zh = "归一�
 |---|---|---|
 | `rv$omics` | active pipeline, NULL = landing page | shell |
 | `rv$obj` | single-cell Seurat object | single-cell modules |
-| `rv$maf` | maftools MAF | `mod_wes_import` only |
+| `rv$maf` | maftools MAF (as imported, or filtered) | `mod_wes_import`; `mod_wes_filter` (always from its pinned input, `step_input()`) |
+| `rv$wes_sequenced` | every sample of the imported MAF, incl. silent-only ones: a sample the filters emptied is still sequenced (WT, TMB 0) | `mod_wes_import` only |
 | `rv$clinical` | the full normalised clinical cohort, shared by all omics; never an analysis subset | `mod_clinical` only |
 | `rv$wes_clin_raw` | clinical table as read with the MAF (id column renamed to `Tumor_Sample_Barcode`) | `mod_wes_import` only |
 | `rv$markers` | the current marker table | `mod_markers` only |
@@ -350,7 +351,9 @@ and results may go into publications.
 11. **Enrichment backgrounds.** ORA uses the genes actually tested as the
     universe; GSEA ranks all tested genes (never a pre-filtered list).
 12. **Who is wild-type.** In WES, a sequenced sample with no mutation record is
-    wild-type, not missing (`wes_mutation_status(universe =)`).
+    wild-type, not missing (`wes_mutation_status(universe =)`), and its TMB is
+    0. That includes samples the Variant filters step left with no variant:
+    pass `rv$wes_sequenced` (`sequenced =` / `samples =`).
 
 ---
 

@@ -21,7 +21,7 @@ LABEL org.opencontainers.image.title="OmicOne" \
 RUN R -e "install.packages(c( \
       'shiny','bslib','ggplot2','Matrix','plotly','DT','shinyWidgets', \
       'promises','future','progressr','remotes','Seurat','SeuratObject', \
-      'harmony','survival','patchwork','leidenbase','igraph','RANN','maxstat', \
+      'harmony','survival','patchwork','leidenbase','igraph','RANN','maxstat','pROC', \
       'hdf5r','data.table'), \
       repos='https://cloud.r-project.org')"
 

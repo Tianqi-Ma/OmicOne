@@ -149,7 +149,7 @@ mod_wes_surv_server <- function(id, rv, log_rv) {
       tc <- isTRUE(input$tcga12)
       ids <- wes_norm_id(sp$df[[sp$id]], tc)
       ids <- unique(ids[!is.na(ids) & nzchar(ids)])
-      maf_ids <- unique(wes_norm_id(wes_samples(rv$maf), tc))
+      maf_ids <- unique(wes_norm_id(union(wes_samples(rv$maf), rv$wes_sequenced), tc))
       list(rows = nrow(sp$df), ids = length(ids), in_maf = sum(ids %in% maf_ids),
            no_maf = sum(!ids %in% maf_ids), maf = length(maf_ids))
     })
@@ -257,7 +257,7 @@ mod_wes_surv_server <- function(id, rv, log_rv) {
 
       st <- tryCatch(wes_mutation_status(rv$maf, genes,
                                          universe = if (unmatched_wt) sp$df[[sp$id]],
-                                         tcga12 = tcga12),
+                                         tcga12 = tcga12, sequenced = rv$wes_sequenced),
                      error = function(e) {
                        wes_notify(conditionMessage(e), conditionMessage(e), duration = 12)
                        NULL

@@ -18,8 +18,8 @@ laml <- local({
 
 test_that("the WES step registry is internally consistent", {
   steps <- steps_wes()
-  expect_equal(length(steps), 12)
-  expect_equal(vapply(steps, function(s) s$n, numeric(1)), 1:12)
+  expect_equal(length(steps), 15)
+  expect_equal(vapply(steps, function(s) s$n, numeric(1)), 1:15)
   expect_true(all(vapply(steps, function(s) is.function(s$ui), logical(1))))
   # keys are prefixed so they cannot collide with another omics' namespaces
   expect_true(all(grepl("^wes_", vapply(steps, function(s) s$v, character(1)))))
@@ -451,4 +451,199 @@ test_that("signature extraction recovers known COSMIC signatures from a syntheti
   expect_setequal(m$best_match, c("SBS1", "SBS4", "SBS13"))
   expect_true(all(m$cosine > 0.85))
   expect_equal(out$db, wes_sig_db())
+})
+
+# ---- variant filters, TMB vs outcome, report ----------------------------------
+
+toy_maf_dt <- function() {
+  data.frame(Hugo_Symbol = c("TP53", "KRAS", "EGFR", "PIK3CA", "TP53", "BRAF", "APC", "MUC16"),
+             Chromosome = c("17", "12", "7", "3", "17", "7", "5", "19"),
+             Start_Position = c(7577120, 25398284, 55249071, 178936091, 7578406, 140453136, 112175639, 9000000),
+             End_Position = c(7577120, 25398284, 55249071, 178936091, 7578406, 140453136, 112175639, 9000000),
+             Reference_Allele = c("C", "C", "C", "G", "C", "A", "C", "G"),
+             Tumor_Seq_Allele2 = c("T", "T", "T", "A", "T", "T", "T", "A"),
+             Variant_Classification = c("Missense_Mutation", "Missense_Mutation", "Missense_Mutation",
+                                        "Missense_Mutation", "Nonsense_Mutation", "Missense_Mutation",
+                                        "Silent", "Missense_Mutation"),
+             Variant_Type = "SNP",
+             Tumor_Sample_Barcode = c("S1", "S1", "S2", "S2", "S3", "S3", "S4", "S5"),
+             FILTER = c("PASS", "PASS", "PASS", "clustered_events", "PASS", "PASS", "PASS", "PASS"),
+             t_ref_count = c(40, 50, 30, 30, 2, 60, 40, 40),
+             t_alt_count = c(20, 2, 15, 12, 2, 30, 20, 20),
+             gnomAD_AF = c(NA, NA, NA, NA, NA, "0.2", NA, NA),
+             stringsAsFactors = FALSE)
+}
+
+test_that("variant filters count each step, keep empty values, and switch off missing columns", {
+  skip_if_not_installed("maftools")
+  m <- suppressMessages(maftools::read.maf(toy_maf_dt(), verbose = FALSE))
+  cols <- wes_filter_cols(wes_fields(m))
+  expect_equal(cols$filter, "FILTER")
+  expect_null(cols$depth)
+  expect_equal(c(cols$ref, cols$alt, cols$pop), c("t_ref_count", "t_alt_count", "gnomAD_AF"))
+  f <- wes_filter_apply(m, pass = TRUE, min_depth = 10, min_alt = 3, min_vaf = 0.05, max_pop = 0.001,
+                        max_normal_alt = 2)
+  fun <- f$funnel
+  expect_equal(fun$filter, c("imported", "FILTER = PASS", "tumour depth >= 10", "alt reads >= 3",
+                             "VAF >= 0.05", "population AF <= 0.001"))
+  expect_equal(fun$removed, c(0, 1, 1, 1, 0, 1))          # PIK3CA; TP53 S3 (depth 4); KRAS (2 alt); BRAF (gnomAD)
+  expect_equal(fun$nonsyn_left[nrow(fun)], 3)              # TP53 S1, EGFR, MUC16
+  expect_equal(f$unavailable, "max_normal_alt")
+  expect_equal(f$lost, "S3")                                # all of S3's calls removed
+  # S4 has only a silent call: maftools lists it with 0 non-synonymous
+  expect_setequal(as.character(maftools::getSampleSummary(f$maf)$Tumor_Sample_Barcode), c("S1", "S2", "S4", "S5"))
+  # the silent APC call is filtered too and stays silent
+  expect_equal(nrow(f$maf@maf.silent), 1)
+  # everything off = the MAF as imported
+  f0 <- wes_filter_apply(m, pass = FALSE)
+  expect_equal(nrow(f0$maf@data), nrow(m@data))
+  # too strict: a clear error, not an empty MAF
+  expect_error(wes_filter_apply(m, min_alt = 1000), "No non-synonymous variant passes")
+  # the logged code reproduces the filtered MAF
+  env <- new.env()
+  env$maf <- m
+  suppressMessages(utils::capture.output(eval(parse(text = wes_filter_code(f)), env)))
+  expect_equal(sort(env$maf@data$Hugo_Symbol), sort(f$maf@data$Hugo_Symbol))
+})
+
+test_that("a sample emptied by the filters still counts: TMB 0 and wild-type", {
+  skip_if_not_installed("maftools")
+  m <- suppressMessages(maftools::read.maf(toy_maf_dt(), verbose = FALSE))
+  seq_all <- wes_all_samples(m)
+  expect_setequal(seq_all, c("S1", "S2", "S3", "S4", "S5"))   # S4 has only a silent call
+  f <- wes_filter_apply(m, min_depth = 10)
+  tm <- wes_tmb(f$maf, capture_size = 30, samples = seq_all)
+  expect_setequal(tm$df$Tumor_Sample_Barcode, seq_all)
+  expect_equal(tm$df$total[tm$df$Tumor_Sample_Barcode == "S3"], 1)   # BRAF passes depth; TP53 does not
+  st <- wes_mutation_status(f$maf, "TP53", sequenced = seq_all)
+  expect_true(st$in_maf[st$.id == "S3"])
+  expect_false(st$mutated[st$.id == "S3"])
+  tt <- wes_tmb_table(f$maf, 30, sequenced = seq_all, universe = c("S9"))
+  expect_equal(tt$in_maf[tt$.id == "S4"], TRUE)
+  expect_equal(tt$in_maf[tt$.id == "S9"], FALSE)
+  expect_equal(tt$tmb[tt$.id == "S9"], 0)
+})
+
+test_that("hypermutators are flagged by the far-out fence, not removed", {
+  skip_if_not_installed("maftools")
+  d <- laml()
+  hm <- wes_hypermutators(d$maf)
+  expect_equal(nrow(hm), 193)
+  expect_false(any(hm$hypermutated))                          # LAML: none
+  expect_gt(attr(hm, "fence"), max(hm$nonsyn))
+  expect_s3_class(wes_hyper_plot(hm), "ggplot")
+  f <- wes_filter_apply(d$maf, min_vaf = 0.05)
+  expect_s3_class(wes_filter_funnel_plot(f$funnel), "ggplot")
+  expect_s3_class(wes_filter_vaf_plot(f$values, 0.05), "ggplot")
+  expect_equal(f$cols$vaf, "i_TumorVAF_WU")
+  expect_true(all(f$values$vaf <= 1, na.rm = TRUE))          # percent column rescaled
+})
+
+test_that("TMB vs survival: Cox per doubling on TCGA-LAML, and the logged code agrees", {
+  skip_if_not_installed("maftools")
+  skip_if_not_installed("survival")
+  d <- laml()
+  tt <- wes_tmb_table(d$maf, 35.8, universe = d$clin$Tumor_Sample_Barcode)
+  expect_equal(nrow(tt), 200)
+  expect_equal(sum(!tt$in_maf), 7)
+  a <- wes_tmb_assoc_data(d$clin, tt, "Tumor_Sample_Barcode", "survival",
+                          "days_to_last_followup", "Overall_Survival_Status", "days")
+  expect_equal(attr(a, "flow")$n, 188)
+  cx <- wes_tmb_cox(a)
+  expect_equal(cx$hr, 0.988, tolerance = 0.01)
+  expect_true(cx$lower < 1 && cx$upper > 1)
+  p <- list(capture = 35.8, id_col = "Tumor_Sample_Barcode", unmatched_zero = TRUE, outcome = "survival",
+            time_col = "days_to_last_followup", time_unit = "days",
+            event_code = wes_event_code(d$clin$Overall_Survival_Status, "Overall_Survival_Status"))
+  env <- new.env()
+  env$maf <- d$maf
+  env$clin_raw <- as.data.frame(d$clin)
+  eval(parse(text = wes_tmb_assoc_code(p)), env)
+  expect_equal(unname(exp(stats::coef(env$fit))), cx$hr, tolerance = 1e-8)
+})
+
+test_that("TMB vs response: logistic OR, AUC and ROC on a simulated response", {
+  skip_if_not_installed("maftools")
+  d <- laml()
+  clin <- as.data.frame(d$clin)
+  tt <- wes_tmb_table(d$maf, 35.8, universe = clin$Tumor_Sample_Barcode)
+  set.seed(3)
+  x <- log2(tt$tmb[match(clin$Tumor_Sample_Barcode, tt$.id)] + 1 / 35.8)
+  clin$resp <- ifelse(stats::runif(nrow(clin)) < stats::plogis(-3 + 1.5 * (x - mean(x))), "CR", "PD")
+  a <- wes_tmb_assoc_data(clin, tt, "Tumor_Sample_Barcode", "response", resp_col = "resp", positive = "CR")
+  r <- wes_tmb_logit(a)
+  expect_gt(r$or, 1)
+  expect_gt(r$auc, 0.5)
+  expect_true(r$auc_lower <= r$auc && r$auc <= r$auc_upper)
+  # the hand-rolled AUC equals the rank (Mann-Whitney) AUC
+  w <- suppressWarnings(stats::wilcox.test(a$x[a$.resp == 1], a$x[a$.resp == 0]))$statistic
+  expect_equal(r$auc, unname(w) / (r$n_resp * r$n_non), tolerance = 1e-8)
+  expect_equal(utils::tail(r$roc, 1)$fpr, 1)
+  expect_s3_class(wes_tmb_roc_plot(r), "ggplot")
+  expect_s3_class(wes_tmb_resp_plot(a, r, "CR"), "ggplot")
+  expect_silent(parse(text = wes_tmb_assoc_code(list(capture = 35.8, id_col = "Tumor_Sample_Barcode",
+                                                      unmatched_zero = FALSE, outcome = "response",
+                                                      resp_col = "resp", positive = "CR"))))
+})
+
+test_that("the filter, TMB-outcome and report modules run end to end", {
+  skip_if_not_installed("maftools")
+  d <- laml()
+  rv <- shiny::reactiveValues(omics = "wes", maf = d$maf, maf_source = "Demo: TCGA LAML",
+                              wes_sequenced = wes_all_samples(d$maf), status = list(),
+                              clinical = NULL, wes_clin_raw = d$clin, epoch_wes = 1L, ckpt = new.env())
+  log_rv <- shiny::reactiveVal(list())
+  suppressWarnings(suppressMessages(shiny::testServer(mod_wes_filter_server,
+    args = list(rv = rv, log_rv = log_rv), {
+      session$flushReact()
+      session$setInputs(pass = TRUE, min_depth = 10, min_alt = 3, min_vaf = 0.1, max_pop = 0.001, max_nalt = NA)
+      session$setInputs(run = 1)
+      session$flushReact()
+      expect_equal(res$out$funnel$nonsyn_left[nrow(res$out$funnel)], 1702)
+      # a second run with looser thresholds starts from the imported MAF
+      session$setInputs(min_vaf = 0.02)
+      session$setInputs(run = 2)
+      session$flushReact()
+      expect_equal(res$out$funnel$nonsyn_left[1], 1732)
+    })))
+  expect_true(isTRUE(shiny::isolate(rv$status$wes_filter)))
+  expect_lt(nrow(shiny::isolate(rv$maf)@data), nrow(d$maf@data) + 1)
+  suppressWarnings(suppressMessages(shiny::testServer(mod_wes_tmbclin_server,
+    args = list(rv = rv, log_rv = log_rv), {
+      session$flushReact()
+      session$setInputs(capture = 35.8, outcome = "survival", unmatched_zero = TRUE)
+      session$flushReact()
+      session$setInputs(id_col = "Tumor_Sample_Barcode", time_col = "days_to_last_followup",
+                        time_unit = "days", event_col = "Overall_Survival_Status")
+      session$setInputs(run = 1)
+      session$flushReact()
+      expect_equal(res$fit$n, 188)
+      expect_false(is.null(res$km))
+    })))
+  expect_true(isTRUE(shiny::isolate(rv$status$wes_tmbclin)))
+  ent <- shiny::isolate(log_rv())
+  steps <- vapply(ent, `[[`, "", "step")
+  expect_true(all(c("WES variant filters", "WES TMB vs outcome") %in% steps))
+  # testServer namespaces are not step keys: tag the entries as the app would
+  keys <- c(`WES variant filters` = "wes_filter", `WES TMB vs outcome` = "wes_tmbclin")
+  ent <- lapply(ent, function(e) {
+    e$key <- keys[[e$step]]
+    e$omics <- "wes"
+    e
+  })
+  log_rv(c(list(list(step = "WES import", key = "wes_import", omics = "wes", params = list(),
+                     code = wes_import_code(maf_file = NULL, clin_file = "tcga_laml_annot.tsv", demo = TRUE,
+                                            id_from = "Tumor_Sample_Barcode", text_cols = "Tumor_Sample_Barcode",
+                                            read_args = list(isTCGA = FALSE, rmFlags = FALSE)))), ent))
+  suppressWarnings(suppressMessages(shiny::testServer(mod_wes_report_server,
+    args = list(rv = rv, log_rv = log_rv), {
+      session$setInputs(sections = names(report_sections_wes()), title = "x")
+      session$flushReact()
+      expect_length(report_entries(), 3)
+      f <- output$download_script
+      expect_true(file.exists(f))
+      txt <- readLines(f)
+      expect_true(any(grepl("read.maf", txt, fixed = TRUE)))
+      expect_silent(parse(text = txt))
+    })))
 })

@@ -951,7 +951,7 @@
     period: 8.5,
     stages: [[0, 2.8, "Every step you ran is logged", "你运行的每一步都被记录"],
              [2.8, 5.8, "Parameters and code are written up", "参数与代码被整理成文"],
-             [5.8, 8.5, "Download it as HTML or Markdown", "下载为 HTML 或 Markdown"]],
+             [5.8, 8.5, "Download it as one self-contained HTML file", "下载为一个独立的 HTML 文件"]],
     still: 7.2,
     init: function (R) {
       var lines = [];
@@ -979,8 +979,7 @@
         }
       });
       var dl = seg(t, 6, 6.8);
-      g.chip("report.html", 460, 110, th.accent, dl, { size: 10.5 });
-      g.chip("report.md", 460, 145, th.muted, dl, { size: 10.5 });
+      g.chip("report.html", 460, 128, th.accent, dl, { size: 10.5 });
       g.arrow(dx + dw + 8, 128, dx + dw + 8 + 30 * dl, 128, th.accent, 2, dl);
     }
   });
