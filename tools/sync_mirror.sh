@@ -58,7 +58,7 @@ copy_one "$OMIC/inst/app/www/explain-sc.js" "$SC/inst/app/www/explain-sc.js"
 
 # Shared test files (the omics-specific ones are edited per repo).
 for t in helper-fake.R test-logic.R test-survival.R test-state.R \
-         test-sc-compute.R test-scop.R; do
+         test-sc-compute.R test-scop.R test-sample.R; do
   [ -f "$OMIC/tests/testthat/$t" ] && copy_one "$OMIC/tests/testthat/$t" "$SC/tests/testthat/$t"
 done
 

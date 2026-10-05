@@ -121,7 +121,7 @@ Browser uploads are capped high (5 GB by default; change with
 
 ## The single-cell steps
 
-Seven phases, twenty-one steps. Bold = the default method.
+Eight phases, twenty-three steps. Bold = the default method.
 
 | Phase | # | Step | Methods offered |
 |---|---|------|-----------------|
@@ -136,16 +136,18 @@ Seven phases, twenty-one steps. Bold = the default method.
 | **Identity** | 9 | Markers | **wilcox** / roc / MAST |
 | | 10 | Annotate | **manual** / SingleR (per cluster, pruned labels) / Azimuth |
 | | 11 | Enrichment / GSEA | ORA + GSEA (clusterProfiler via scop) |
-| **Trajectory** | 12 | Trajectory | **Slingshot** / Monocle2 / Monocle3 / PAGA / Palantir |
-| | 13 | RNA velocity | scVelo (steady-state / stochastic / dynamical) |
-| | 14 | Dynamic features | scop dynamic features + heatmap |
-| **Advanced** | 15 | Cell cycle & signatures | Seurat cell cycle, UCell / AddModuleScore |
-| | 16 | Cell communication | LIANA / CellChat |
-| | 17 | Malignant / CNV | CopyKAT, stemness |
-| | 18 | **Clinical & survival** | Kaplan-Meier + log-rank + univariable Cox; stratify by a clinical column or by per-sample cell-type composition (median / tertile / optimal cutpoint) |
-| **Output** | 19 | Visualize | UMAP / violin / dotplot / feature / heatmap |
-| | 20 | Report | narrated HTML report from the reproducibility log |
-| | 21 | Export | .rds / .h5ad (best-effort) / figures / R script |
+| **Compare conditions** | 12 | Pseudobulk DE | counts summed per sample × cell type; **edgeR quasi-likelihood** / limma-voom / DESeq2; optional pairing / batch covariate |
+| | 13 | Differential abundance | cell-type proportions per sample, propeller (logit + limma robust eBayes, BH) |
+| **Trajectory** | 14 | Trajectory | **Slingshot** / Monocle2 / Monocle3 / PAGA / Palantir |
+| | 15 | RNA velocity | scVelo (steady-state / stochastic / dynamical) |
+| | 16 | Dynamic features | scop dynamic features + heatmap |
+| **Advanced** | 17 | Cell cycle & signatures | Seurat cell cycle, UCell / AddModuleScore |
+| | 18 | Cell communication | LIANA / CellChat |
+| | 19 | Malignant / CNV | CopyKAT, stemness |
+| | 20 | **Clinical & survival** | Kaplan-Meier + log-rank + univariable Cox; stratify by a clinical column or by per-sample cell-type composition (median / tertile / optimal cutpoint) |
+| **Output** | 21 | Visualize | UMAP / violin / dotplot / feature / heatmap |
+| | 22 | Report | narrated HTML report from the reproducibility log |
+| | 23 | Export | .rds / .h5ad (best-effort) / figures / R script |
 
 A **⤓ Export** menu in the top bar is available on *every* step (object,
 metadata, counts, embeddings) so you never have to reach the last step to get

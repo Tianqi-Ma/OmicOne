@@ -177,6 +177,8 @@ app_server <- function(input, output, session) {
   mod_markers_server("markers", rv, log_rv)
   mod_annotate_server("annotate", rv, log_rv)
   mod_enrichment_server("enrichment", rv, log_rv)
+  mod_pseudobulk_server("pseudobulk", rv, log_rv)
+  mod_abundance_server("abundance", rv, log_rv)
   mod_trajectory_server("trajectory", rv, log_rv)
   mod_velocity_server("velocity", rv, log_rv)
   mod_dynamic_server("dynamic", rv, log_rv)

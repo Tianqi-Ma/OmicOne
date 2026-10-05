@@ -29,6 +29,7 @@ report_sections <- function() {
     markers    = list(en = "Marker genes",        zh = "标志基因",     keys = "markers"),
     annotation = list(en = "Annotation",          zh = "注释",         keys = "annotate"),
     enrichment = list(en = "Enrichment / GSEA",   zh = "富集 / GSEA",  keys = "enrichment"),
+    compare    = list(en = "Condition comparisons", zh = "条件比较",   keys = c("pseudobulk", "abundance")),
     trajectory = list(en = "Trajectory, velocity & dynamics", zh = "轨迹、速率与动态",
                       keys = c("trajectory", "velocity", "dynamic")),
     signatures = list(en = "Cell cycle & signatures", zh = "细胞周期与信号", keys = "cellcycle"),

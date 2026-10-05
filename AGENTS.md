@@ -333,7 +333,11 @@ and results may go into publications.
    Fisher...). Never mix a Cox p-value onto a KM curve without saying so.
 7. **Pseudo-replication**: cell-level tests (e.g. FindAllMarkers) are labelled
    as marker discovery, not as between-condition inference. Condition
-   comparisons across samples use pseudo-bulk or sample-level statistics.
+   comparisons across samples use pseudo-bulk or sample-level statistics:
+   the Pseudobulk DE and Differential abundance steps (`fct_sample.R`). A
+   condition must be constant within a sample (`sample_table()` refuses a
+   cell-level column), the FDR of pseudobulk DE is computed within each cell
+   type, and a cell type with < 2 samples per group is skipped, not tested.
 8. **Multi-sample data**: per-sample operations stay per-sample (doublet
    detection, QC thresholds where batches differ).
 9. **State the denominator.** Percentages and burdens say what they are

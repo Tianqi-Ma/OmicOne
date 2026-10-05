@@ -509,6 +509,108 @@
     }
   });
 
+  // ---- pseudobulk DE ---------------------------------------------------------
+  X.register("pseudobulk", {
+    period: 10,
+    stages: [[0, 3.2, "Six samples; one cell type highlighted", "六个样本；突出显示一种细胞类型"],
+             [3.2, 6.4, "Sum that cell type's counts within each sample", "在每个样本内把该类型细胞的计数相加"],
+             [6.4, 10, "Compare 3 samples with 3 samples, not cells with cells", "比较 3 个样本对 3 个样本，而不是细胞对细胞"]],
+    still: 9,
+    init: function (R) {
+      var smp = [];
+      for (var i = 0; i < 6; i++) {
+        var cx = 70 + i * 84, cells = [];
+        for (var j = 0; j < 16; j++) {
+          cells.push({ x: cx + H.clamp(H.gauss(R) * 11, -24, 24), y: 106 + H.clamp(H.gauss(R) * 18, -38, 38),
+                       k: j < 6 ? 0 : 1 + (j % 3), d: R() });
+        }
+        smp.push({ cx: cx, cells: cells, h: (i < 3 ? [42, 52, 36] : [92, 104, 84])[i % 3] });
+      }
+      return { smp: smp };
+    },
+    draw: function (g, s, t) {
+      var th = g.th, base = 222, fly = seg(t, 3.4, 5), grow = seg(t, 4.6, 6), cmp = seg(t, 6.6, 7.6);
+      s.smp.forEach(function (sm, i) {
+        var a0 = seg(t, 0.1 + i * 0.12, 0.8 + i * 0.12);
+        g.box(sm.cx - 32, 60, 64, 92, th.border, 1, a0 * (1 - fly), 8);
+        g.text("S" + (i + 1), sm.cx, lerp(52, 233, fly), { col: th.muted, size: 10, align: "center", a: a0 });
+        sm.cells.forEach(function (c) {
+          var hi = c.k === 0, foc = seg(t, 1.6, 2.6);
+          if (!hi) { g.dot(c.x, c.y, 3, PAL[c.k], a0 * lerp(0.75, 0.18, foc) * (1 - fly)); return; }
+          var x = lerp(c.x, sm.cx, fly), y = lerp(c.y, base - 4, fly);
+          g.dot(x, y, lerp(3.4, 1.5, fly), PAL[0], a0 * (1 - grow));
+        });
+        g.rect(sm.cx - 14, base - sm.h * grow, 28, sm.h * grow, PAL[0], 0.85, 3);
+      });
+      if (grow > 0) g.line(40, base, 530, base, th.muted, 1, grow * 0.7);
+      g.t("highlighted: T cells", "突出显示：T 细胞", 280, 168, { col: PAL[0], size: 10.5, bold: true, align: "center",
+        a: seg(t, 1.6, 2.6) * (1 - fly) });
+      if (grow > 0.3) g.t("summed counts of one gene", "某基因的加和计数", 40, 146, { col: th.muted, size: 9.5, a: seg(t, 5, 6) * (1 - cmp) });
+      if (cmp > 0) {
+        [[0, 3, "ctrl", "对照"], [3, 6, "treated", "处理"]].forEach(function (gr, k) {
+          var x0 = s.smp[gr[0]].cx - 22, x1 = s.smp[gr[1] - 1].cx + 22, m = 0;
+          for (var i = gr[0]; i < gr[1]; i++) m += s.smp[i].h / 3;
+          g.line(x0, base - m, x1, base - m, k ? th.accent : th.muted, 2, cmp, [5, 4]);
+          g.chip(L(gr[2], gr[3]), x0, base - m - 16, k ? th.accent : th.muted, cmp, { size: 10, align: "left" });
+        });
+        g.t("n = 3 vs 3 (samples are the replicates)", "n = 3 对 3（样本才是重复）", 280, 56, { col: th.accent2, size: 11, bold: true, align: "center", a: seg(t, 7.4, 8.2) });
+      }
+    }
+  });
+
+  // ---- differential abundance --------------------------------------------------
+  X.register("abundance", {
+    period: 9.5,
+    stages: [[0, 3, "Count each cell type in every sample", "统计每个样本中各细胞类型的数量"],
+             [3, 6, "Turn counts into each sample's proportions", "把计数换算成每个样本内的比例"],
+             [6, 9.5, "Compare one cell type's share across samples", "跨样本比较某一细胞类型的占比"]],
+    still: 8.6,
+    init: function (R) {
+      var smp = [];
+      for (var i = 0; i < 6; i++) {
+        var trt = i >= 3, tot = 0.55 + R() * 0.45;
+        var share = trt ? [0.42, 0.30 + R() * 0.06, 0.28] : [0.52, 0.12 + R() * 0.06, 0.36];
+        var sum = share[0] + share[1] + share[2];
+        smp.push({ trt: trt, tot: tot, p: share.map(function (v) { return v / sum; }) });
+      }
+      return { smp: smp };
+    },
+    draw: function (g, s, t) {
+      var th = g.th, base = 222, H0 = 160, bw = 30, norm = seg(t, 3.2, 4.8), foc = seg(t, 6.2, 7);
+      g.line(36, base, 330, base, th.muted, 1, 0.6);
+      s.smp.forEach(function (sm, i) {
+        var x = 52 + i * 46 + (sm.trt ? 14 : 0), grow = seg(t, 0.2 + i * 0.25, 1.4 + i * 0.25);
+        var hTot = lerp(sm.tot, 1, norm) * H0 * grow, y = base;
+        sm.p.forEach(function (p, k) {
+          var hh = p * hTot;
+          g.rect(x, y - hh, bw, hh, PAL[[0, 1, 2][k] + (k === 1 ? 2 : 0)], k === 1 ? 0.9 : lerp(0.85, 0.2, foc), 2);
+          y -= hh;
+        });
+        g.text("S" + (i + 1), x + bw / 2, 234, { col: th.muted, size: 9.5, align: "center", a: grow });
+      });
+      g.t("ctrl", "对照", 52 + 46 + bw / 2, 250, { col: th.muted, size: 10, align: "center", bold: true, a: seg(t, 0.5, 1.2) });
+      g.t("treated", "处理", 52 + 4 * 46 + 14 + bw / 2, 250, { col: th.accent2, size: 10, align: "center", bold: true, a: seg(t, 0.5, 1.2) });
+      g.t("100% per sample", "每个样本 100%", 36, base - H0 - 10, { col: th.muted, size: 9.5, a: norm * (1 - foc) });
+      if (foc > 0) {
+        var x0 = 395, y0 = 222, w = 140, h = 160, top = 0.4;
+        g.axes(x0, y0, w, h, "", L("B-cell share", "B 细胞占比"), foc);
+        [0, 1].forEach(function (k) {
+          var cx = x0 + 35 + k * 70, m = 0, n = 0;
+          s.smp.forEach(function (sm, i) {
+            if (sm.trt !== (k === 1)) return;
+            var y = y0 - sm.p[1] / top * h;
+            g.dot(cx + (i % 3 - 1) * 9, lerp(y0, y, seg(t, 6.6 + i * 0.12, 7.4 + i * 0.12)), 4.2, PAL[3], foc);
+            m += sm.p[1]; n++;
+          });
+          var my = y0 - (m / n) / top * h;
+          g.line(cx - 18, my, cx + 18, my, k ? th.accent : th.muted, 2, seg(t, 7.6, 8.2));
+          g.t(k ? "treated" : "ctrl", k ? "处理" : "对照", cx, y0 + 13, { col: th.muted, size: 9.5, align: "center", a: foc });
+        });
+        g.t("logit + limma, BH", "logit + limma，BH 校正", x0 + w, 46, { col: th.accent2, size: 10, bold: true, align: "right", a: seg(t, 7.8, 8.6) });
+      }
+    }
+  });
+
   // ---- 12. trajectory -------------------------------------------------------
   X.register("trajectory", {
     period: 9.5,

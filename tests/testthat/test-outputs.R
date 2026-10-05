@@ -79,6 +79,8 @@ sc_module_servers <- function() {
     markers    = mod_markers_server,
     annotate   = mod_annotate_server,
     enrichment = mod_enrichment_server,
+    pseudobulk = mod_pseudobulk_server,
+    abundance  = mod_abundance_server,
     trajectory = mod_trajectory_server,
     velocity   = mod_velocity_server,
     dynamic    = mod_dynamic_server,

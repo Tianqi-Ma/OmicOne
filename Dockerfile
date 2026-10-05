@@ -28,7 +28,7 @@ RUN R -e "install.packages(c( \
 RUN R -e "BiocManager::install(c( \
       'SingleCellExperiment','SummarizedExperiment','scater','scran', \
       'scDblFinder','glmGamPoi','SingleR','celldex','UCell','clusterProfiler', \
-      'ComplexHeatmap','slingshot','maftools','MAST'), update=FALSE, ask=FALSE)"
+      'ComplexHeatmap','slingshot','maftools','MAST','edgeR','limma','DESeq2'), update=FALSE, ask=FALSE)"
 
 # Mutational-signature extraction needs a reference genome and NMF. This layer
 # is large (~700 MB for the BSgenome); drop it if you never run that step.
