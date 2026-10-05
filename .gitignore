@@ -7,9 +7,15 @@
 
 # build artifacts
 *.tar.gz
-/docs/
+# pkgdown output only: docs/ itself holds the audit report and the gallery
+/docs/reference/
+/docs/articles/
 inst/doc/
 
 # OS
 .DS_Store
 Thumbs.db
+
+# test leftovers
+tests/testthat/Rplots.pdf
+tests/testthat/_snaps/

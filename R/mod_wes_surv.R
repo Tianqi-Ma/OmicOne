@@ -1,10 +1,13 @@
 #' WES module 11: Mutation vs survival
 #'
 #' Does carrying a mutation in a gene (or any gene of a set) change outcome? This
-#' step reuses the shared survival layer (`fct_survival.R`) rather than a
-#' WES-specific one, so the curves, the log-rank test and the Cox screen are
-#' identical to the single-cell side — and a cohort loaded once in the
-#' *Clinical & survival* step is picked up here automatically.
+#' step reuses the shared survival layer (`fct_survival.R`) for the curves, the
+#' log-rank test and the Cox hazard ratio, so they match the single-cell side.
+#' The analysis set is built in [wes_surv_data()]: ids are normalised, samples
+#' are collapsed to one row per patient, and — by default — clinical rows with
+#' no MAF record are kept as sequenced wild-type, because `read.maf()` drops
+#' exactly those patients and the WT arm would otherwise lose them. The shared
+#' `rv$clinical` is only read, never written.
 #'
 #' @param id Module id. @param rv shared hub. @param log_rv repro log.
 #' @name mod_wes_surv
@@ -18,59 +21,72 @@ mod_wes_surv_ui <- function(id) {
     title = list(en = "Mutation vs survival", zh = "突变与预后"),
     what = list(
       en = "Split patients into mutant and wild-type for a gene (or a set of
-            genes) and compare their survival with a Kaplan-Meier curve and the
-            log-rank test.",
-      zh = "按某个基因（或一组基因）把患者分为突变型与野生型，用 Kaplan-Meier 曲线和 log-rank 检验比较两者的生存差异。"),
+            genes) and compare their survival with Kaplan-Meier curves, the
+            log-rank test and a Cox hazard ratio (mutant vs WT).",
+      zh = "按某个基因（或一组基因）把患者分为突变型与野生型，用 Kaplan-Meier 曲线、log-rank 检验和 Cox 风险比（突变型 vs 野生型）比较两者的生存差异。"),
     why  = list(
       en = "Frequency tells you a gene is mutated; survival tells you whether that
-            matters to the patient. This is the step that turns a mutation
-            landscape into a prognostic claim.",
-      zh = "频率只能说明某个基因发生了突变；生存分析才能说明这对患者是否有意义。正是这一步把突变全景变成预后结论。"),
+            matters to the patient. The comparison is only fair if every
+            sequenced patient is in it: a MAF lists samples with variants, so
+            patients with none are missing from it — they belong to the WT arm.",
+      zh = "频率只能说明某个基因发生了突变；生存分析才能说明这对患者是否有意义。只有把每一位已测序的患者都纳入，比较才公平：MAF 只列出有变异的样本，没有任何变异的患者不在其中——他们属于野生型组。"),
     how  = list(
-      en = "Pick one gene to start. Selecting several treats them as a set —
-            <i>mutant</i> means a mutation in <b>any</b> of them, which is the
-            right framing for a pathway. Survival data comes from the clinical
-            table attached to the MAF, or from a cohort you already loaded in the
-            single-cell <b>Clinical &amp; survival</b> step.",
-      zh = "先从单个基因开始。选择多个基因时会作为一个基因集处理——<i>突变型</i>指其中<b>任意一个</b>发生突变，这正适合用于通路层面的分析。生存数据来自随 MAF 附带的临床表，或你已在单细胞<b>临床与生存</b>步骤中加载的队列。"),
+      en = "Pick one gene to start; several genes form a set (<i>mutant</i> =
+            a non-synonymous mutation in <b>any</b> of them). Survival data come
+            from the clinical table imported with the MAF (default) or from the
+            cohort of the <b>Clinical &amp; survival</b> step. Keep <b>no MAF record
+            = WT</b> ticked when the clinical table lists sequenced patients
+            only; untick it if it also lists patients who were never sequenced.
+            Ids are matched without regard to case or spaces; use the TCGA
+            option or a patient-id column when one patient has several samples
+            (mutant if any sample is).",
+      zh = "先从单个基因开始；选择多个基因时作为基因集处理（<i>突变型</i>＝其中<b>任意一个</b>发生非同义突变）。生存数据来自随 MAF 导入的临床表（默认），或<b>临床与生存</b>步骤中的队列。若临床表只包含已测序患者，请保持勾选<b>无 MAF 记录＝野生型</b>；若其中也有从未测序的患者，请取消勾选。编号匹配不区分大小写与空格；一名患者有多个样本时，请使用 TCGA 选项或患者编号列（任一样本突变即算突变型）。"),
     read = list(
       en = "Each curve is the fraction of patients still event-free over time;
-            every step down is an event. The shaded band is the 95% CI — where
-            two bands overlap heavily, the visual gap is noise. The p-value is
-            the log-rank test over the whole curve, and the risk table below
-            shows how many patients each arm still has late on: a separation
-            resting on five patients is fragile, whatever the p-value says.",
-      zh = "每条曲线是随时间推移仍未发生事件的患者比例；每一次下降就是一个事件。阴影带为 95% 置信区间——若两条带大面积重叠，视觉上的差距只是噪声。p 值来自对整条曲线的 log-rank 检验；图下方的风险人数表显示各组在晚期时间点的剩余人数：如果曲线分离只靠五名患者支撑，无论 p 值多小都不牢靠。"),
+            every step down is an event and ticks are censored patients. The
+            shaded band is the 95% CI, and the risk table under the plot shows
+            how many patients each arm still has at each time. The log-rank p
+            tests the whole curves; the HR (95% CI) comes from a Cox model with
+            WT as reference. A separation resting on a handful of late patients
+            is fragile whatever the p-value; small-sample warnings appear above
+            the plot.",
+      zh = "每条曲线是随时间推移仍未发生事件的患者比例；每一次下降是一个事件，刻度线为删失患者。阴影带为 95% 置信区间，图下的风险人数表显示各组在各时间点的剩余人数。log-rank p 检验整条曲线；HR（95% CI）来自以野生型为参照的 Cox 模型。只靠少数晚期患者支撑的曲线分离并不牢靠，无论 p 值多小；小样本警告显示在图上方。"),
     example = list(
-      en = "In TCGA LAML, <code>TP53</code> mutants have clearly worse overall
-               survival; <code>DNMT3A</code> is the classic borderline case.",
-      zh = "在 TCGA LAML 中，<code>TP53</code> 突变型的总生存明显更差；<code>DNMT3A</code> 则是经典的临界案例。")
+      en = "In TCGA LAML (188 patients with follow-up, 7 without any MAF record
+               counted as WT), <code>TP53</code> mutants do clearly worse
+               (log-rank p ≈ 1e-5); <code>DNMT3A</code> mutants also do worse
+               (p ≈ 0.001), while <code>FLT3</code> does not separate (p ≈ 0.14).",
+      zh = "在 TCGA LAML 中（188 名有随访的患者，其中 7 名无任何 MAF 记录者计为野生型），<code>TP53</code> 突变型明显更差（log-rank p ≈ 1e-5）；<code>DNMT3A</code> 突变型同样更差（p ≈ 0.001），而 <code>FLT3</code> 没有分离（p ≈ 0.14）。")
   )
   controls <- shiny::tagList(
     shiny::uiOutput(ns("gene_ui")),
+    label_with_help("Endpoint name", "Used in the plot title and the insight, e.g. Overall survival, Progression-free survival.",
+                    label_zh = "终点名称", tip_zh = "用于图标题和结论栏，例如 Overall survival、Progression-free survival。"),
+    shiny::textInput(ns("endpoint"), NULL, value = "Overall survival"),
     shiny::hr(),
     shiny::uiOutput(ns("source_ui")),
     shiny::uiOutput(ns("mapping_ui")),
+    shiny::uiOutput(ns("options_ui")),
     run_button(ns("run"), "Run survival analysis", "运行生存分析")
   )
   step_container(
     title     = list(en = "Mutation vs survival", zh = "突变与预后"),
-    subtitle  = list(en = "Kaplan-Meier curves for mutant versus wild-type.",
-                     zh = "突变型与野生型的 Kaplan-Meier 生存曲线。"),
+    subtitle  = list(en = "Kaplan-Meier curves, log-rank test and Cox HR for mutant versus wild-type.",
+                     zh = "突变型与野生型的 Kaplan-Meier 曲线、log-rank 检验与 Cox 风险比。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = shiny::tagList(
       shiny::uiOutput(ns("insight")),
       bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Kaplan-Meier", "生存曲线"),
-                       preview_plot_ui(ns("km"), download = TRUE,
-                                       guide = list(en = "The Kaplan-Meier curves will be drawn here.",
-                                                    zh = "运行后，这里将绘制 Kaplan-Meier 生存曲线。"),
-                                       caption = list(en = "Curves: fraction event-free over time; band = 95% CI; table below = patients still at risk.",
-                                                      zh = "曲线：随时间的无事件比例；阴影带＝95% CI；下表＝各时点风险人数。"))),
-      bslib::nav_panel(i18n("Cohort", "队列表"), shiny::uiOutput(ns("tbl_slot")))
-    ))
+        bslib::nav_panel(i18n("Kaplan-Meier", "生存曲线"),
+                         preview_plot_ui(ns("km"), download = TRUE,
+                                         guide = list(en = "The Kaplan-Meier curves will be drawn here.",
+                                                      zh = "运行后，这里将绘制 Kaplan-Meier 生存曲线。"),
+                                         caption = list(en = "Curves: fraction event-free over time (months); band = 95% CI; ticks = censored; table below = patients still at risk. p = log-rank; HR = Cox, mutant vs WT.",
+                                                        zh = "曲线：随时间（月）的无事件比例；阴影带＝95% CI；刻度＝删失；下表＝各时点风险人数。p＝log-rank；HR＝Cox，突变型 vs 野生型。"))),
+        bslib::nav_panel(i18n("Cohort", "队列表"), shiny::uiOutput(ns("tbl_slot")))
+      ))
   )
 }
 
@@ -79,227 +95,323 @@ mod_wes_surv_ui <- function(id) {
 mod_wes_surv_server <- function(id, rv, log_rv) {
   shiny::moduleServer(id, function(input, output, session) {
     ns  <- session$ns
-    res <- shiny::reactiveValues(df = NULL, fit = NULL, lr = NULL, label = NULL,
-                                 matched = NA_integer_)
+    res <- step_results(rv, "wes", df = NULL, fit = NULL, lr = NULL, hr = NULL,
+                        warn = character(0), label = NULL, endpoint = NULL, flow = NULL,
+                        source = NULL)
 
     output$gene_ui <- shiny::renderUI({
       shiny::req(rv$maf)
       g <- wes_genes(rv$maf, n = 300)
-      shiny::tagList(
-        label_with_help("Gene(s)",
-                        "One gene, or several treated as a set (mutant = a mutation in any of them).",
-                        label_zh = "基因",
-                        tip_zh = "可选单个基因，也可选多个作为基因集（突变型 = 其中任一发生突变）。"),
-        shiny::selectizeInput(ns("genes"), NULL, choices = g, multiple = TRUE,
-                              selected = if (length(g)) g[1] else NULL)
-      )
+      wes_col_select(ns, "genes",
+                     label = list(en = "Gene(s)", zh = "基因"),
+                     tip = list(en = "One gene, or several treated as a set (mutant = a non-synonymous mutation in any of them).",
+                                zh = "可选单个基因，也可选多个作为基因集（突变型＝其中任一发生非同义突变）。"),
+                     choices = g, selected = if (length(g)) g[1] else NULL, multiple = TRUE)
     })
 
-    # Survival data can come from the MAF's own clinical table, or from the
-    # cohort the shared Clinical & survival step already normalised.
     has_shared <- shiny::reactive(!is.null(rv$clinical) && nrow(rv$clinical) > 0)
 
     output$source_ui <- shiny::renderUI({
       shiny::req(rv$maf)
-      choices <- c("Clinical table in the MAF" = "maf")
-      if (has_shared()) {
-        choices <- c("Cohort loaded in Clinical & survival" = "shared", choices)
-      }
+      choices <- c("Clinical table imported with the MAF" = "maf")
+      if (has_shared()) choices <- c(choices, "Cohort from Clinical & survival" = "shared")
       shiny::tagList(
         label_with_help("Survival data from",
-                        "The shared cohort is whatever you loaded in the Clinical & survival step; it is already normalised.",
+                        "The shared cohort is the table loaded in the Clinical & survival step; this step only reads it.",
                         label_zh = "生存数据来源",
-                        tip_zh = "共享队列即你在「临床与生存」步骤中加载的数据，已完成标准化。"),
+                        tip_zh = "共享队列即「临床与生存」步骤中加载的表；本步骤只读取，不修改。"),
         shiny::radioButtons(ns("src"), NULL, choices,
-                            selected = if (has_shared()) "shared" else "maf")
+                            selected = keep_selected(shiny::isolate(input$src), choices, "maf"))
       )
+    })
+
+    src_kind <- shiny::reactive(if (identical(input$src, "shared") && has_shared()) "shared"
+                                else "maf")
+
+    # the table the analysis set is built from, and its column mapping
+    source_spec <- shiny::reactive({
+      shiny::req(rv$maf)
+      if (identical(src_kind(), "shared")) {
+        return(list(df = rv$clinical, id = ".id", time = ".time", event = ".event",
+                    unit = "months", patient = NULL))
+      }
+      df <- rv$wes_clin_raw
+      shiny::req(df, input$id_col, input$time_col, input$event_col)
+      shiny::req(all(c(input$id_col, input$time_col, input$event_col) %in% names(df)))
+      pcol <- input$patient_col
+      list(df = df, id = input$id_col, time = input$time_col, event = input$event_col,
+           unit = input$time_unit %||% "days",
+           patient = if (!is.null(pcol) && nzchar(pcol) && pcol %in% names(df)) pcol else NULL)
+    })
+
+    overlap <- shiny::reactive({
+      sp <- source_spec()
+      tc <- isTRUE(input$tcga12)
+      ids <- wes_norm_id(sp$df[[sp$id]], tc)
+      ids <- unique(ids[!is.na(ids) & nzchar(ids)])
+      maf_ids <- unique(wes_norm_id(wes_samples(rv$maf), tc))
+      list(rows = nrow(sp$df), ids = length(ids), in_maf = sum(ids %in% maf_ids),
+           no_maf = sum(!ids %in% maf_ids), maf = length(maf_ids))
     })
 
     output$mapping_ui <- shiny::renderUI({
       shiny::req(rv$maf)
-      if (identical(input$src, "shared")) {
-        return(shiny::div(class = "omicone-status-empty",
-                          i18n("Using the cohort from the Clinical &amp; survival step.",
-                               "正在使用「临床与生存」步骤中的队列。")))
+      if (identical(src_kind(), "shared")) {
+        ov <- tryCatch(overlap(), error = function(e) NULL)
+        txt_en <- if (is.null(ov)) "Using the cohort from the Clinical &amp; survival step."
+                  else sprintf("Shared cohort: %s rows; %s of its ids are MAF samples.",
+                               wes_fmt(ov$rows), wes_fmt(ov$in_maf))
+        txt_zh <- if (is.null(ov)) "正在使用「临床与生存」步骤中的队列。"
+                  else sprintf("共享队列：%s 行；其中 %s 个编号是 MAF 样本。",
+                               wes_fmt(ov$rows), wes_fmt(ov$in_maf))
+        return(shiny::div(class = "omicone-status-empty", i18n(txt_en, txt_zh)))
       }
-      cols <- wes_clinical_cols(rv$maf)
-      if (!length(cols)) {
+      df <- rv$wes_clin_raw
+      if (is.null(df) || !ncol(df)) {
         return(shiny::div(class = "omicone-status-empty",
-                          i18n("This MAF carries no clinical columns. Attach a clinical table on the Import step, or load a cohort in the Clinical &amp; survival step.",
-                               "该 MAF 未附带临床列。请在导入步骤附上临床表，或在「临床与生存」步骤加载队列。")))
+                          i18n("No clinical table was imported with this MAF. Attach one on the Import step, or load a cohort in the Clinical &amp; survival step.",
+                               "导入该 MAF 时未附带临床表。请在导入步骤附上临床表，或在「临床与生存」步骤加载队列。")))
       }
+      cols <- names(df)
       pick <- function(cands, default = cols[1]) {
         hit <- cols[tolower(cols) %in% cands]
         if (length(hit)) hit[1] else default
       }
+      time_sel <- pick(c("days_to_last_followup", "os_months", "os_days", "os.time",
+                         "overall_survival_time", "time", "futime", "os"))
+      unit_guess <- if (grepl("month", time_sel, ignore.case = TRUE)) "months"
+                    else if (grepl("year", time_sel, ignore.case = TRUE)) "years" else "days"
+      event_sel <- pick(c("overall_survival_status", "os_status", "os.event", "vital_status",
+                          "status", "fustat"))
       shiny::tagList(
-        label_with_help("Follow-up time", "Column holding time to event or last contact.",
-                        label_zh = "随访时间", tip_zh = "存放到终点事件或最后随访时间的列。"),
-        shiny::selectInput(ns("time_col"), NULL, cols,
-                           selected = pick(c("days_to_last_followup", "os_months",
-                                             "overall_survival_time", "time", "futime"))),
+        wes_col_select(ns, "id_col",
+                       label = list(en = "Sample id", zh = "样本编号"),
+                       tip = list(en = "Matched to the MAF's Tumor_Sample_Barcode after upper-casing and trimming.",
+                                  zh = "转为大写并去除空格后，与 MAF 的 Tumor_Sample_Barcode 匹配。"),
+                       choices = cols, selected = keep_selected(shiny::isolate(input$id_col), cols,
+                                                                pick("tumor_sample_barcode"))),
+        wes_col_select(ns, "time_col",
+                       label = list(en = "Follow-up time", zh = "随访时间"),
+                       tip = list(en = "Time to event or last contact. Missing or non-finite values (Inf) are dropped and counted.",
+                                  zh = "到终点事件或最后随访的时间。缺失或非有限值（Inf）会被剔除并计数。"),
+                       choices = cols, selected = keep_selected(shiny::isolate(input$time_col),
+                                                                cols, time_sel)),
         shiny::selectInput(ns("time_unit"), i18n("Time unit", "时间单位"),
                            c("Days" = "days", "Months" = "months", "Years" = "years"),
-                           selected = "days"),
-        label_with_help("Outcome", "1 / Dead / TRUE = the event happened.",
-                        label_zh = "终点事件", tip_zh = "1 / Dead / TRUE 表示事件发生。"),
-        shiny::selectInput(ns("event_col"), NULL, cols,
-                           selected = pick(c("overall_survival_status", "os_status",
-                                             "vital_status", "status", "fustat")))
+                           selected = keep_selected(shiny::isolate(input$time_unit),
+                                                    c("days", "months", "years"), unit_guess)),
+        wes_col_select(ns, "event_col",
+                       label = list(en = "Outcome", zh = "终点事件"),
+                       tip = list(en = "1 / Dead / TRUE = the event happened.",
+                                  zh = "1 / Dead / TRUE 表示事件发生。"),
+                       choices = cols,
+                       selected = keep_selected(shiny::isolate(input$event_col), cols, event_sel)),
+        wes_col_select(ns, "patient_col",
+                       label = list(en = "Patient id (optional)", zh = "患者编号（可选）"),
+                       tip = list(en = "When several samples belong to one patient: one row per patient, mutant if any sample is. Follow-up must agree across a patient's rows.",
+                                  zh = "一名患者有多个样本时使用：每名患者一行，任一样本突变即为突变型。同一患者各行的随访信息必须一致。"),
+                       choices = cols, selected = keep_selected(shiny::isolate(input$patient_col),
+                                                                c("", cols), ""),
+                       none = "(none — one row per sample)")
+      )
+    })
+
+    output$options_ui <- shiny::renderUI({
+      shiny::req(rv$maf)
+      ov <- tryCatch(overlap(), error = function(e) NULL)
+      k <- if (is.null(ov)) "?" else wes_fmt(ov$no_maf)
+      tcga_like <- mean(grepl("^TCGA-", wes_samples(rv$maf))) > 0.5
+      shiny::tagList(
+        shiny::checkboxInput(
+          ns("unmatched_wt"),
+          i18n(sprintf("The %s clinical sample(s) with no MAF record were sequenced: count them as WT", k),
+               sprintf("临床表中无 MAF 记录的 %s 个样本已测序、视为 WT", k)),
+          value = isTRUE(shiny::isolate(input$unmatched_wt) %||% TRUE)),
+        shiny::div(class = "omicone-muted",
+                   i18n("read.maf keeps only samples with at least one variant, so a sequenced patient with none is absent from the MAF; dropping them would bias the WT arm. Untick if the table also lists unsequenced patients.",
+                        "read.maf 只保留至少有一个变异的样本，没有任何变异的已测序患者因此不在 MAF 中；剔除他们会使野生型组产生偏倚。若临床表中还有未测序的患者，请取消勾选。")),
+        if (tcga_like) {
+          shiny::checkboxInput(ns("tcga12"),
+                               i18n("Match TCGA barcodes on the first 12 characters (patient)",
+                                    "按 TCGA 条码前 12 位（患者）匹配"),
+                               value = isTRUE(shiny::isolate(input$tcga12)))
+        }
       )
     })
 
     shiny::observeEvent(input$run, {
       shiny::req(rv$maf, input$genes)
       if (!require_pkgs("maftools", "Mutation vs survival")) return(NULL)
+      genes <- input$genes
+      endpoint <- trimws(input$endpoint %||% "")
+      if (!nzchar(endpoint)) endpoint <- "Overall survival"
+      kind <- src_kind()
+      sp <- tryCatch(source_spec(), error = function(e) NULL)
+      if (is.null(sp) || is.null(sp$df) || !nrow(sp$df)) {
+        wes_notify("No usable clinical table: attach one at import, or load a cohort in Clinical & survival.",
+                   "没有可用的临床表：请在导入时附上临床表，或在「临床与生存」中加载队列。")
+        return(NULL)
+      }
+      tcga12 <- isTRUE(input$tcga12)
+      unmatched_wt <- isTRUE(input$unmatched_wt)
 
-      # 1. per-sample mutation status
-      st <- tryCatch(wes_mutation_status(rv$maf, input$genes),
+      st <- tryCatch(wes_mutation_status(rv$maf, genes,
+                                         universe = if (unmatched_wt) sp$df[[sp$id]],
+                                         tcga12 = tcga12),
                      error = function(e) {
-                       shiny::showNotification(conditionMessage(e), type = "error",
-                                               duration = 12); NULL })
+                       wes_notify(conditionMessage(e), conditionMessage(e), duration = 12)
+                       NULL
+                     })
       if (is.null(st)) return(NULL)
-
-      # 2. the cohort
-      if (identical(input$src, "shared")) {
-        clin <- rv$clinical
-        if (is.null(clin) || !nrow(clin)) {
-          shiny::showNotification("No shared cohort loaded yet.", type = "error",
-                                  duration = 10)
-          return(NULL)
-        }
-      } else {
-        shiny::req(input$time_col, input$event_col)
-        cd <- as.data.frame(maftools::getClinicalData(rv$maf))
-        clin <- tryCatch(
-          normalise_clinical(cd, "Tumor_Sample_Barcode", input$time_col,
-                             input$event_col, time_unit = input$time_unit),
-          error = function(e) {
-            shiny::showNotification(conditionMessage(e), type = "error", duration = 12)
-            NULL
-          })
-        if (is.null(clin) || !nrow(clin)) {
-          shiny::showNotification(
-            "No usable follow-up rows: check the time and outcome columns.",
-            type = "error", duration = 12)
-          return(NULL)
-        }
-      }
-
-      # 3. join
-      clin$.group <- st$status[match(clin$.id, st$.id)]
-      matched <- sum(!is.na(clin$.group))
-      if (matched < 3) {
-        shiny::showNotification(
-          paste("Only", matched, "sample id(s) matched between the survival",
-                "table and the MAF. Check that both use the same barcodes."),
-          type = "error", duration = 15)
+      d <- tryCatch(wes_surv_data(sp$df, st, sp$id, sp$time, sp$event, time_unit = sp$unit,
+                                  patient_col = sp$patient, tcga12 = tcga12,
+                                  unmatched_wt = unmatched_wt),
+                    error = function(e) {
+                      wes_notify(conditionMessage(e), conditionMessage(e), duration = 15)
+                      NULL
+                    })
+      if (is.null(d)) return(NULL)
+      fl <- attr(d, "flow")
+      if (nrow(d) < 3 || fl$matched < 3) {
+        wes_notify(sprintf("Only %d patient(s) with follow-up (%d matched to the MAF). Check that both tables use the same sample ids.",
+                           nrow(d), fl$matched),
+                   sprintf("只有 %d 名有随访的患者（%d 名与 MAF 匹配）。请检查两张表是否使用相同的样本编号。",
+                           nrow(d), fl$matched), duration = 15)
         return(NULL)
       }
-      clin <- clin[!is.na(clin$.group), , drop = FALSE]
-      clin$.group <- factor(clin$.group, levels = c("WT", "Mutant"))
-      if (length(unique(clin$.group[!is.na(clin$.group)])) < 2) {
-        shiny::showNotification(
-          "Every matched patient falls in one group; nothing to compare.",
-          type = "error", duration = 12)
+      if (length(unique(d$.group)) < 2) {
+        wes_notify("Every patient falls in one group; nothing to compare.",
+                   "所有患者都落在同一组，无法比较。", duration = 12)
         return(NULL)
       }
-
-      fit <- tryCatch(km_fit(clin), error = function(e) {
-        shiny::showNotification(paste("Survival fit failed:", conditionMessage(e)),
-                                type = "error", duration = 12); NULL })
+      fit <- tryCatch(km_fit(d), error = function(e) {
+        wes_notify(paste("Survival fit failed:", conditionMessage(e)),
+                   paste("生存拟合失败：", conditionMessage(e)), duration = 12)
+        NULL
+      })
       if (is.null(fit)) return(NULL)
+      lr <- logrank_test(d)
+      hr <- tryCatch(cox_hr(d), error = function(e) NULL)
+      warn <- tryCatch(survival_warnings(d), error = function(e) character(0))
 
-      res$df      <- clin
-      res$fit     <- fit
-      res$lr      <- logrank_test(clin)
-      res$label   <- paste(input$genes, collapse = " / ")
-      res$matched <- matched
-      rv$clinical <- clin        # keep the joined cohort for the other pipelines
+      res$df       <- d
+      res$fit      <- fit
+      res$lr       <- lr
+      res$hr       <- hr
+      res$warn     <- warn
+      res$label    <- paste(genes, collapse = " / ")
+      res$endpoint <- endpoint
+      res$flow     <- fl
+      res$source   <- kind
       mark_done(rv, "wes_surv")
       log_step(log_rv, "WES mutation vs survival",
-               params = list(genes = paste(input$genes, collapse = ", "),
-                             source = input$src, matched = matched),
-               code = c(
-                 sprintf('mut <- maftools::subsetMaf(maf, genes = c("%s"))',
-                         paste(input$genes, collapse = '", "')),
-                 'clin$group <- ifelse(clin$id %in% mut_samples, "Mutant", "WT")',
-                 'survival::survdiff(survival::Surv(time, event) ~ group, data = clin)'))
-      shiny::showNotification("Survival analysis complete.", type = "message")
+               params = list(genes = paste(genes, collapse = ", "), endpoint = endpoint,
+                             source = kind, id = sp$id, time = sp$time, unit = sp$unit,
+                             event = sp$event, patient = sp$patient %||% "(none)",
+                             tcga12 = tcga12, unmatched_as_WT = unmatched_wt,
+                             n = fl$n, events = fl$events),
+               code = wes_surv_code(list(genes = genes, source = kind, id_col = sp$id,
+                                         time_col = sp$time, event_col = sp$event,
+                                         time_unit = sp$unit, patient_col = sp$patient,
+                                         tcga12 = tcga12, unmatched_wt = unmatched_wt,
+                                         raw_event = sp$df[[sp$event]])))
+    })
+
+    stats <- shiny::reactive({
+      shiny::req(res$df, res$fit)
+      med <- tryCatch(km_medians(res$fit), error = function(e) NULL)
+      med_txt <- "-"
+      if (!is.null(med) && nrow(med)) {
+        med <- med[match(c("WT", "Mutant"), med$group), , drop = FALSE]
+        med_txt <- paste(trimws(format_median(med$median)), collapse = " / ")
+      }
+      hr <- res$hr
+      hr_txt <- if (!is.null(hr) && is.finite(hr$hr))
+        sprintf("%.2f (%.2f–%.2f)", hr$hr, hr$lower, hr$upper) else "-"
+      p <- res$lr$p
+      list(flow = res$flow, med = med_txt, hr = hr_txt,
+           hr_p = if (!is.null(hr)) hr$p else NA_real_,
+           p = if (is.null(p) || !is.finite(p)) NA_real_ else p)
     })
 
     output$summary <- shiny::renderUI({
       if (is.null(rv$maf)) return(wes_no_maf())
-      d <- res$df
-      if (is.null(d)) {
+      if (is.null(res$df)) {
         return(wes_prompt("Pick a gene and click <b>Run survival analysis</b>.",
                           "选择基因后点击<b>运行生存分析</b>。"))
       }
-      med <- km_medians(res$fit)
-      p <- res$lr$p
-      n_mut <- sum(d$.group == "Mutant", na.rm = TRUE)
-      bslib::layout_columns(
-        col_widths = c(3, 3, 3, 3),
-        stat_tile(i18n("Patients", "患者数"), format(nrow(d), big.mark = ",")),
-        stat_tile(i18n("Mutant", "突变型"), format(n_mut, big.mark = ",")),
-        stat_tile(i18n("Median OS (mo)", "中位生存(月)"),
-                  if (nrow(med)) paste(round(med$median, 1), collapse = " / ") else "-"),
+      s <- stats()
+      shiny::tagList(
+        stat_tile(i18n("Patients (events)", "患者数（事件数）"),
+                  sprintf("%s (%s)", wes_fmt(s$flow$n), wes_fmt(s$flow$events))),
+        stat_tile(i18n("Mutant / WT", "突变型 / 野生型"),
+                  sprintf("%s / %s", wes_fmt(s$flow$n_mut), wes_fmt(s$flow$n_wt))),
+        stat_tile(i18n("Median, mo (WT / Mut)", "中位生存，月（野生/突变）"), s$med),
         stat_tile(i18n("Log-rank p", "Log-rank p"),
-                  if (is.null(p)) "-" else signif(p, 3))
+                  if (is.na(s$p)) "-" else format(signif(s$p, 3))),
+        stat_tile(i18n("HR mut vs WT (Cox)", "HR 突变 vs 野生（Cox）"), s$hr)
       )
     })
 
     output$insight <- shiny::renderUI({
-      d <- res$df
-      if (is.null(d)) return(NULL)
-      p <- res$lr$p
-      med <- tryCatch(km_medians(res$fit), error = function(e) NULL)
-      med_txt <- if (!is.null(med) && nrow(med)) paste(round(med$median, 1), collapse = " / ") else "?"
-      n_mut <- sum(d$.group == "Mutant", na.rm = TRUE)
-      n_wt  <- sum(d$.group == "WT", na.rm = TRUE)
-      sig_p <- !is.null(p) && is.finite(p) && p < 0.05
-      verdict_en <- if (sig_p)
-        "the separation is statistically significant — still, check the risk table for how many patients support the late part of the curves"
-      else "the separation is not statistically significant; with small groups that often means underpowered rather than equal"
-      verdict_zh <- if (sig_p)
-        "分离具有统计学显著性——但仍请看风险人数表：曲线后段还剩多少患者支撑"
-      else "分离不具统计学显著性；组小时这往往意味着效能不足，而非两组真的相同"
+      if (is.null(res$df)) return(NULL)
+      s <- stats()
+      fl <- s$flow
+      flow_en <- sprintf("Clinical table %s rows (%s ids%s); MAF %s samples; %s matched; %s without a MAF record %s; %s dropped for missing time or event.",
+                         wes_fmt(fl$clin_rows), wes_fmt(fl$clin_ids),
+                         if (fl$dup_rows > 0) sprintf(", %s duplicate rows collapsed", wes_fmt(fl$dup_rows)) else "",
+                         wes_fmt(fl$maf_samples), wes_fmt(fl$matched), wes_fmt(fl$unmatched),
+                         if (fl$unmatched_wt) "counted as WT" else "left out",
+                         wes_fmt(fl$dropped_na))
+      flow_zh <- sprintf("临床表 %s 行（%s 个编号%s）；MAF %s 个样本；匹配 %s 个；无 MAF 记录 %s 个%s；因时间或事件缺失剔除 %s 个。",
+                         wes_fmt(fl$clin_rows), wes_fmt(fl$clin_ids),
+                         if (fl$dup_rows > 0) sprintf("，合并重复行 %s 行", wes_fmt(fl$dup_rows)) else "",
+                         wes_fmt(fl$maf_samples), wes_fmt(fl$matched), wes_fmt(fl$unmatched),
+                         if (fl$unmatched_wt) "，计为野生型" else "，未纳入",
+                         wes_fmt(fl$dropped_na))
+      sig <- !is.na(s$p) && s$p < 0.05
+      verdict_en <- if (sig) "the curves separate (log-rank p < 0.05); check the risk table for how many patients carry the late part"
+                    else "no significant separation; with small groups that often means underpowered rather than equal"
+      verdict_zh <- if (sig) "曲线分离（log-rank p < 0.05）；请看风险人数表中曲线后段还剩多少患者"
+                    else "未见显著分离；组小时这往往意味着效能不足，而非两组真的相同"
+      warn <- res$warn
+      warn_txt <- if (length(warn)) paste0(" <b>Caution:</b> ", paste(warn, collapse = "; "), ".") else ""
       insight_bar(
-        sprintf("<b>%s</b>: %s mutant vs %s wild-type patients; median OS %s months (WT / mutant); log-rank p = %s — %s.",
-                res$label, format(n_mut, big.mark = ","), format(n_wt, big.mark = ","),
-                med_txt, if (is.null(p)) "?" else signif(p, 3), verdict_en),
-        sprintf("<b>%s</b>：突变型 %s 人 vs 野生型 %s 人；中位生存 %s 个月（野生型/突变型）；log-rank p = %s——%s。",
-                res$label, format(n_mut, big.mark = ","), format(n_wt, big.mark = ","),
-                med_txt, if (is.null(p)) "?" else signif(p, 3), verdict_zh))
+        sprintf("<b>%s</b>, %s: %s mutant vs %s WT patients (%s events); median %s months (WT / mutant, NR = not reached); log-rank p = %s; Cox HR %s — %s. %s%s",
+                res$label, res$endpoint, wes_fmt(fl$n_mut), wes_fmt(fl$n_wt), wes_fmt(fl$events),
+                s$med, if (is.na(s$p)) "-" else format(signif(s$p, 3)), s$hr, verdict_en,
+                flow_en, warn_txt),
+        sprintf("<b>%s</b>，%s：突变型 %s 人 vs 野生型 %s 人（%s 个事件）；中位生存 %s 个月（野生型/突变型，NR＝未达到）；log-rank p = %s；Cox HR %s——%s。%s%s",
+                res$label, res$endpoint, wes_fmt(fl$n_mut), wes_fmt(fl$n_wt), wes_fmt(fl$events),
+                s$med, if (is.na(s$p)) "-" else format(signif(s$p, 3)), s$hr, verdict_zh,
+                flow_zh, if (length(warn)) paste0("<b>注意：</b>", paste(warn, collapse = "；"), "。")
+                         else ""))
     })
 
     km_gg <- function() {
       shiny::req(res$fit)
+      note <- if (length(res$warn)) paste("Caution:", paste(res$warn, collapse = "; ")) else NULL
       km_plot(res$fit, res$lr,
-              title = paste0("Overall survival — ", res$label %||% "mutation status"))
+              title = paste0(res$endpoint %||% "Overall survival", " — ",
+                             res$label %||% "mutation status"),
+              hr = res$hr, note = note)
     }
-    output$km <- render_scop_plot(km_gg)
-    register_figure_download(output, input, "km", function() print(km_gg()),
-                             "wes_kaplan_meier", width = 8, height = 6)
+    render_step_plot(output, input, "km", km_gg, name = "wes_kaplan_meier",
+                     width = 8, height = 7)
 
-    output$tbl_slot <- shiny::renderUI({
-      if (is.null(res$df)) return(wes_no_maf())
-      if (has_pkg("DT")) DT::dataTableOutput(ns("tbl"))
-      else shiny::verbatimTextOutput(ns("tbl_txt"))
-    })
     view <- shiny::reactive({
-      d <- res$df; shiny::req(d)
-      out <- d[, intersect(c(".id", ".time", ".event", ".group"), names(d)), drop = FALSE]
-      names(out) <- sub("^\\.", "", names(out))
-      out$time <- round(out$time, 1)
+      d <- res$df
+      shiny::req(d)
+      out <- data.frame(patient = d$.id, time_months = round(d$.time, 2), event = d$.event,
+                        group = as.character(d$.group), in_MAF = d$.in_maf,
+                        stringsAsFactors = FALSE)
       out
     })
-    if (has_pkg("DT")) {
-      output$tbl <- DT::renderDataTable(
-        DT::datatable(view(), rownames = FALSE, filter = "top",
-                      options = list(pageLength = 15, scrollX = TRUE)))
-    } else {
-      output$tbl_txt <- shiny::renderPrint(utils::head(view(), 20))
-    }
+    tb <- wes_table(ns, "tbl", view, "wes_survival_cohort",
+                    has_maf = function() !is.null(rv$maf),
+                    ready = function() !is.null(res$df))
+    output$tbl_slot <- tb$slot
+    output$tbl <- tb$table
+    output$tbl_dl <- tb$download
   })
 }

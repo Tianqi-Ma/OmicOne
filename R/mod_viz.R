@@ -23,10 +23,11 @@ mod_viz_ui <- function(id) {
             marker genes -- and to build the figures for your report.",
       zh = "作图是核查聚类、注释和标志基因是否合理的最快方式，也是为报告制作图表的手段。"),
     how  = list(
-      en = "Pick a plot type. <b>UMAP by metadata</b> colours cells by a column.
-            <b>Violin / Dot / Feature / Heatmap</b> show expression of the genes
-            you type (comma separated). Nothing here changes your object.",
-      zh = "选择一种图表类型。<b>按元数据着色的 UMAP</b> 会按某一列为细胞着色。<b>小提琴图 / 点图 / 特征图 / 热图</b>展示你输入的基因（以逗号分隔）的表达。此处的操作不会改动你的对象。"),
+      en = "Pick a plot type. <b>Embedding by metadata</b> colours cells by a column
+            on the UMAP (or, without one, the object's default reduction, named in
+            the summary). <b>Violin / Dot / Feature / Heatmap</b> show expression of
+            the genes you type. Nothing here changes your object.",
+      zh = "选择一种图表类型。<b>按元数据着色的嵌入图</b>在 UMAP 上按某一列为细胞着色（若没有 UMAP，则使用对象的默认降维，名称显示在摘要中）。<b>小提琴图 / 点图 / 特征图 / 热图</b>展示你输入的基因的表达。此处的操作不会改动你的对象。"),
     read = list(
       en = "Pick a feature to colour cells by expression, or a grouping to
             compare populations. Use it to verify markers and annotations
@@ -39,11 +40,11 @@ mod_viz_ui <- function(id) {
   )
   controls <- shiny::tagList(
     label_with_help("Plot type",
-                    "UMAP colours cells by metadata; the others show gene expression.",
+                    "The embedding colours cells by metadata; the others show gene expression.",
                     "图表类型",
-                    "UMAP 按元数据为细胞着色；其他类型展示基因表达。"),
+                    "嵌入图按元数据为细胞着色；其他类型展示基因表达。"),
     shiny::selectInput(ns("ptype"), NULL,
-                       choices = c("UMAP by metadata" = "umap",
+                       choices = c("Embedding by metadata" = "umap",
                                    "Violin plot"      = "violin",
                                    "Dot plot"         = "dotplot",
                                    "Feature plot"     = "feature",
@@ -57,9 +58,9 @@ mod_viz_ui <- function(id) {
     shiny::conditionalPanel(
       sprintf("input['%s'] != 'umap'", ns("ptype")),
       label_with_help("Genes",
-                      "Comma-separated gene names for expression plots (violin/dot/feature/heatmap).",
+                      "Gene names for expression plots, separated by commas, spaces or new lines.",
                       "基因",
-                      "用于表达图（violin/dot/feature/heatmap）的基因名，以逗号分隔。"),
+                      "用于表达图的基因名，以逗号、空格或换行分隔。"),
       shiny::textInput(ns("genes"), NULL, placeholder = "e.g. CD3D, MS4A1, LYZ")
     ),
     shiny::checkboxInput(ns("mask"),
@@ -89,21 +90,21 @@ mod_viz_server <- function(id, rv, log_rv) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # Keep the metadata-column selector in sync with the current object.
     shiny::observe({
       obj <- rv$obj
-      cols <- if (is.null(obj)) character(0) else obj_meta_cols(obj)
-      sel <- if ("celltype" %in% cols) "celltype"
-             else if ("seurat_clusters" %in% cols) "seurat_clusters"
-             else if (length(cols)) cols[1] else NULL
-      shiny::updateSelectInput(session, "meta_col", choices = cols, selected = sel)
+      cols <- categorical_cols(obj_meta(obj))
+      def <- default_group_col(cols, obj_misc(obj, "omicone_cluster_col"))
+      shiny::updateSelectInput(session, "meta_col", choices = cols,
+                               selected = keep_selected(shiny::isolate(input$meta_col), cols, def))
     })
 
-    parse_genes <- function(txt) {
-      if (is.null(txt) || !nzchar(trimws(txt))) return(character(0))
-      g <- trimws(strsplit(txt, ",", fixed = TRUE)[[1]])
-      g[nzchar(g)]
-    }
+    # The embedding drawn: UMAP when present, else the object's default
+    # reduction (which can be a PCA, so its name is shown in the summary).
+    reduction <- shiny::reactive({
+      obj <- rv$obj
+      if (has_reduction(obj, "umap")) return("umap")
+      tryCatch(SeuratObject::DefaultDimReduc(obj), error = function(e) NULL)
+    })
 
     # Is this plot type worth making interactive (ggplotly)?
     #
@@ -129,13 +130,13 @@ mod_viz_server <- function(id, rv, log_rv) {
       shiny::req(obj)
       if (!require_pkgs("Seurat", "Visualization")) return(NULL)
       genes <- parse_genes(input$genes)
-      red <- if (has_reduction(obj, "umap")) "umap" else obj_reductions(obj)[1]
+      red <- reduction()
       tryCatch({
         switch(input$ptype,
           umap = {
             shiny::validate(shiny::need(length(red) && !is.na(red),
-                                        "No UMAP/embedding found. Run an embedding first."))
-            # Outlined (mascarade) view: use scop's dim plot with mask overlays.
+                                        "No embedding found. Run an embedding first."))
+            # Outlined (mascarade) view: outlines follow the chosen column.
             if (isTRUE(input$mask) && has_pkg("scop") && !is.null(input$meta_col)) {
               p <- sc_dimplot(obj, group_by = input$meta_col, reduction = red,
                               mask = TRUE)
@@ -147,7 +148,7 @@ mod_viz_server <- function(id, rv, log_rv) {
           feature = {
             shiny::validate(shiny::need(length(genes) > 0, "Enter at least one gene."))
             shiny::validate(shiny::need(length(red) && !is.na(red),
-                                        "No UMAP/embedding found. Run an embedding first."))
+                                        "No embedding found. Run an embedding first."))
             Seurat::FeaturePlot(obj, features = genes, reduction = red) &
               omicone_theme()
           },
@@ -165,15 +166,26 @@ mod_viz_server <- function(id, rv, log_rv) {
             shiny::validate(shiny::need(length(genes) > 0, "Enter at least one gene."))
             Seurat::DoHeatmap(obj, features = genes, group.by = input$meta_col)
           })
-      }, error = function(e) {
-        shiny::showNotification(paste("Plot error:", conditionMessage(e)),
-                                type = "error", duration = 10)
+      },
+      # req()/validate() are not errors: let them through so the output stays
+      # blank (or shows the validate message) instead of raising a red toast.
+      shiny.silent.error = function(e) stop(e),
+      error = function(e) {
+        shiny::showNotification(
+          i18n(paste("Plot error:", conditionMessage(e)),
+               paste("作图出错：", conditionMessage(e))),
+          type = "error", duration = 10)
         NULL
       })
     })
 
     # Choose the correct output widget for the current plot type.
     output$plot_slot <- shiny::renderUI({
+      if (is.null(rv$obj)) {
+        return(explain_scene("viz",
+                             "Load and process data, then pick a plot type on the left.",
+                             "加载并处理数据后，在左侧选择图表类型。"))
+      }
       if (is_interactive()) {
         plotly::plotlyOutput(ns("iplot"), height = "480px")
       } else {
@@ -209,10 +221,9 @@ mod_viz_server <- function(id, rv, log_rv) {
       }
       dims <- obj_dims(obj)
       genes <- parse_genes(input$genes)
-      bslib::layout_columns(
-        col_widths = c(4, 4, 4),
+      shiny::tagList(
         stat_tile(i18n("Cells", "细胞数"), format(dims$cells, big.mark = ",")),
-        stat_tile(i18n("Plot", "图表"), input$ptype),
+        stat_tile(i18n("Embedding", "嵌入"), reduction() %||% i18n("none", "无")),
         stat_tile(i18n("Genes requested", "请求的基因数"), length(genes))
       )
     })

@@ -1,53 +1,87 @@
 #' Module: Export report
 #'
-#' Generate a narrated, scCancer-style HTML report of the analysis: the methods
-#' used, their parameters and equivalent code, assembled from the reproducibility
-#' log. No heavy compute happens here -- it only reads what previous steps logged.
+#' Generate a narrated, scCancer-style HTML report of the analysis: the steps
+#' run, their parameters and equivalent code, and the R session, assembled from
+#' the reproducibility log. No heavy compute happens here -- it only reads what
+#' previous steps logged.
 #'
 #' @param id Module id. @param rv shared hub. @param log_rv repro log.
 #' @name mod_report
 NULL
 
-# Report sections offered to the user. Each maps to keyword(s) matched (case-
-# insensitively) against a logged step's name, so the report only narrates the
-# sections the user asked for.
-.report_sections <- list(
-  qc            = list(en = "Quality control",   zh = "质量控制",   kw = c("qc", "quality")),
-  doublet       = list(en = "Doublets",          zh = "双细胞",     kw = c("doublet")),
-  normalize     = list(en = "Normalization",     zh = "标准化",     kw = c("normal")),
-  reduce        = list(en = "Features & PCA",    zh = "特征与 PCA", kw = c("pca", "feature", "reduc")),
-  integrate     = list(en = "Integration",       zh = "整合",       kw = c("integr")),
-  cluster       = list(en = "Clustering",        zh = "聚类",       kw = c("cluster")),
-  embed         = list(en = "Embedding",         zh = "降维可视化", kw = c("embed", "umap", "tsne")),
-  markers       = list(en = "Marker genes",      zh = "标志基因",   kw = c("marker")),
-  annotation    = list(en = "Annotation",        zh = "注释",       kw = c("annot")),
-  trajectory    = list(en = "Trajectory",        zh = "拟时序",     kw = c("trajector", "pseudotime", "dynamic")),
-  enrichment    = list(en = "Enrichment / GSEA", zh = "富集 / GSEA", kw = c("enrich", "gsea")),
-  malignancy    = list(en = "Malignant / CNV",   zh = "恶性 / CNV", kw = c("cnv", "malignant", "stemness")),
-  survival      = list(en = "Clinical & survival", zh = "临床与生存", kw = c("clinical", "surviv")),
-  wes           = list(en = "Somatic mutations",  zh = "体细胞突变", kw = c("wes", "maf", "oncoplot", "tmb"))
-)
+#' Report sections and the step keys each one covers
+#'
+#' Log entries carry the key of the step that wrote them (`$key`), so a
+#' section matches steps by key, never by a word in the step's name.
+#' @return Named list: en, zh, keys.
+#' @keywords internal
+report_sections <- function() {
+  wes_keys <- tryCatch(vapply(steps_wes(), function(s) s$v, character(1)),
+                       error = function(e) character(0))
+  list(
+    qc         = list(en = "Quality control",     zh = "质量控制",     keys = "qc"),
+    doublet    = list(en = "Doublets",            zh = "双细胞",       keys = "doublet"),
+    normalize  = list(en = "Normalization",       zh = "标准化",       keys = "normalize"),
+    reduce     = list(en = "Features & PCA",      zh = "特征与 PCA",   keys = "reduce"),
+    integrate  = list(en = "Integration",         zh = "整合",         keys = "integrate"),
+    cluster    = list(en = "Clustering",          zh = "聚类",         keys = "cluster"),
+    embed      = list(en = "Embedding",           zh = "降维可视化",   keys = "embed"),
+    markers    = list(en = "Marker genes",        zh = "标志基因",     keys = "markers"),
+    annotation = list(en = "Annotation",          zh = "注释",         keys = "annotate"),
+    enrichment = list(en = "Enrichment / GSEA",   zh = "富集 / GSEA",  keys = "enrichment"),
+    trajectory = list(en = "Trajectory, velocity & dynamics", zh = "轨迹、速率与动态",
+                      keys = c("trajectory", "velocity", "dynamic")),
+    signatures = list(en = "Cell cycle & signatures", zh = "细胞周期与信号", keys = "cellcycle"),
+    cellcomm   = list(en = "Cell communication",  zh = "细胞通讯",     keys = "cellcomm"),
+    malignancy = list(en = "Malignant / CNV",     zh = "恶性 / CNV",   keys = "malignancy"),
+    survival   = list(en = "Clinical & survival", zh = "临床与生存",   keys = "clinical"),
+    wes        = list(en = "Somatic mutations",   zh = "体细胞突变",   keys = wes_keys)
+  )
+}
+
+#' Keep the log entries of the ticked report sections
+#'
+#' An entry whose step key belongs to no section (or that has no key) is
+#' always kept, so nothing that ran is silently left out.
+#' @param entries Log entries. @param sections Ticked section names.
+#' @param defs Output of [report_sections()].
+#' @keywords internal
+report_filter_entries <- function(entries, sections, defs = report_sections()) {
+  if (is.null(entries) || !length(entries)) return(entries)
+  all_keys <- unlist(lapply(defs, `[[`, "keys"), use.names = FALSE)
+  sel_keys <- unlist(lapply(defs[intersect(sections, names(defs))], `[[`, "keys"),
+                     use.names = FALSE)
+  Filter(function(e) {
+    k <- e$key %||% ""
+    k %in% sel_keys || !k %in% all_keys
+  }, entries)
+}
 
 #' @rdname mod_report
 #' @keywords internal
 mod_report_ui <- function(id) {
   ns <- shiny::NS(id)
+  secs <- report_sections()
   explainer <- explainer_card(
     title = list(en = "Export report", zh = "导出报告"),
     what = list(
-      en = "Generate a narrated HTML report of your analysis: the methods,
-            figures, and parameters for each step you ran.",
-      zh = "生成一份叙述式 HTML 分析报告：包含你运行的每一步的方法、图表和参数。"),
+      en = "Generate an HTML report of your analysis: for each step you ran, when it
+            ran, its parameters and its R code, followed by the R session and
+            package versions.",
+      zh = "生成一份 HTML 分析报告：对你运行过的每一步，列出运行时间、参数与 R 代码，最后附上 R 会话与包版本。"),
     why  = list(
-      en = "A shareable, human-readable summary (scCancer-style) documents what
-            was done and how -- for collaborators, supervisors, or a methods
-            section.",
-      zh = "一份可分享、易读的摘要（scCancer 风格）记录了做了什么以及如何做 —— 供合作者、导师或方法学部分使用。"),
+      en = "A shareable, human-readable record (scCancer-style) of what was done and
+            how, for collaborators, supervisors or a methods section.",
+      zh = "一份可分享、易读的记录（scCancer 风格），说明做了什么以及如何做，供合作者、导师或方法学部分使用。"),
     how  = list(
       en = "Tick the sections to include and give the report a title, then click
-            <b>Download report</b>. The report is built from the reproducibility
-            log, so it always matches what you actually ran.",
-      zh = "勾选要包含的章节并为报告命名，然后点击<b>下载报告</b>。报告依据可复现日志生成，因此始终与你实际运行的步骤一致。"),
+            <b>Download report</b>. The report is built from the log of the steps
+            you ran; a step re-run replaces its earlier entry.",
+      zh = "勾选要包含的章节并为报告命名，然后点击<b>下载报告</b>。报告依据你运行过的步骤的日志生成；重新运行某一步会替换它之前的记录。"),
+    read = list(
+      en = "Each section is one step: time, parameters and code. The report holds no
+            figures; download those from each step's figure button.",
+      zh = "每个章节对应一步：时间、参数与代码。报告不含图表；图表请在各步骤中通过下载按钮获取。"),
     example = list(
       en = "A report titled <i>PBMC 3k analysis</i> with QC, Clustering and
                Annotation sections, ready to attach to an email.",
@@ -58,14 +92,14 @@ mod_report_ui <- function(id) {
                     label_zh = "报告标题", tip_zh = "作为报告的标题显示。"),
     shiny::textInput(ns("title"), NULL, value = "OmicOne analysis report"),
     label_with_help("Sections to include",
-                    "Only the ticked sections are narrated (matched against the steps you ran).",
+                    "Only the ticked sections are written (matched by the key of the steps you ran).",
                     label_zh = "包含的章节",
-                    tip_zh = "只有勾选的章节会被写入报告（与你运行过的步骤匹配）。"),
+                    tip_zh = "只写入勾选的章节（按你运行过的步骤的标识匹配）。"),
     shiny::checkboxGroupInput(
       ns("sections"), NULL,
-      choices  = stats::setNames(names(.report_sections),
-                                 vapply(.report_sections, `[[`, character(1), "en")),
-      selected = names(.report_sections)),
+      choiceNames = unname(lapply(secs, function(x) i18n(x$en, x$zh))),
+      choiceValues = names(secs),
+      selected = names(secs)),
     shiny::downloadButton(ns("download_report"),
                           i18n("Download report", "下载报告"), class = "w-100")
   )
@@ -83,21 +117,14 @@ mod_report_ui <- function(id) {
 mod_report_server <- function(id, rv, log_rv) {
   shiny::moduleServer(id, function(input, output, session) {
 
-    # Keep only the logged steps that match the ticked sections. A step whose
-    # name matches no known section keyword is always kept (never silently lost).
-    filter_entries <- function(entries, sections) {
-      if (is.null(entries) || !length(entries)) return(entries)
-      all_kw  <- unlist(lapply(.report_sections, `[[`, "kw"))
-      sel_kw  <- unlist(lapply(.report_sections[sections], `[[`, "kw"))
-      Filter(function(e) {
-        s <- tolower(e$step)
-        known <- any(vapply(all_kw, function(k) grepl(k, s, fixed = TRUE), logical(1)))
-        selected <- any(vapply(sel_kw, function(k) grepl(k, s, fixed = TRUE), logical(1)))
-        selected || !known
-      }, entries)
-    }
+    # Single-cell steps, plus the WES steps when that section is ticked.
+    report_entries <- shiny::reactive({
+      all <- log_rv()
+      entries <- c(log_entries_for(all, "sc"), log_entries_for(all, "wes"))
+      report_filter_entries(entries, input$sections %||% character(0))
+    })
 
-    # Format one step's parameters as "k=v, k=v".
+    # Format one step's parameters as "k = v, k = v".
     params_text <- function(params) {
       if (!length(params)) return("")
       paste(vapply(names(params), function(k)
@@ -118,7 +145,7 @@ mod_report_server <- function(id, rv, log_rv) {
         "    toc: true",
         "---",
         "",
-        "> Generated by OmicOne from the reproducibility log.",
+        "> Generated by OmicOne from the log of the steps you ran.",
         "")
       if (is.null(entries) || !length(entries)) {
         return(paste(c(lines, "No analysis steps were recorded yet."), collapse = "\n"))
@@ -132,7 +159,9 @@ mod_report_server <- function(id, rv, log_rv) {
           if (nzchar(p)) c("**Parameters:**", "", sprintf("`%s`", p), "") else NULL,
           if (length(e$code)) c("**Code:**", "", "```r", e$code, "```", "") else NULL)
       }))
-      paste(c(lines, body), collapse = "\n")
+      sess <- c("## R session and package versions", "", "```",
+                session_info_lines(log_code_packages(entries)), "```", "")
+      paste(c(lines, body, sess), collapse = "\n")
     }
 
     # Self-contained HTML fallback when rmarkdown/pandoc is unavailable.
@@ -156,7 +185,7 @@ mod_report_server <- function(id, rv, log_rv) {
         sprintf("<title>%s</title>", esc(title)),
         sprintf("<style>%s</style></head><body>", css),
         sprintf("<h1>%s</h1>", esc(title)),
-        sprintf("<p class='muted'>Generated by OmicOne &middot; %s</p>",
+        sprintf("<p class='muted'>Generated by OmicOne from the log of the steps you ran &middot; %s</p>",
                 format(Sys.time(), "%Y-%m-%d %H:%M:%S")))
       if (is.null(entries) || !length(entries)) {
         body <- "<p>No analysis steps were recorded yet.</p>"
@@ -172,18 +201,22 @@ mod_report_server <- function(id, rv, log_rv) {
                       esc(paste(e$code, collapse = "\n"))) else "")
         }))
       }
-      paste(c(head, body, "</body></html>"), collapse = "\n")
+      sess <- c("<h2>R session and package versions</h2>",
+                sprintf("<pre>%s</pre>",
+                        esc(paste(session_info_lines(log_code_packages(entries)),
+                                  collapse = "\n"))))
+      paste(c(head, body, sess, "</body></html>"), collapse = "\n")
     }
 
     output$summary <- shiny::renderUI({
-      entries <- log_rv()
+      entries <- report_entries()
       if (is.null(entries) || !length(entries)) {
         return(shiny::div(class = "omicone-placeholder",
-                          i18n("No steps recorded yet. Run some analysis steps first.",
-                               "尚未记录任何步骤。请先运行一些分析步骤。")))
+                          i18n("No steps recorded yet (or none in the ticked sections). Run some analysis steps first.",
+                               "尚未记录任何步骤（或勾选的章节中没有步骤）。请先运行一些分析步骤。")))
       }
       shiny::tagList(
-        stat_tile(i18n("Steps performed", "已执行步骤数"), length(entries)),
+        stat_tile(i18n("Steps in report", "报告中的步骤数"), length(entries)),
         shiny::tags$ol(class = "omicone-steps",
           lapply(entries, function(e) {
             shiny::tags$li(shiny::tags$b(e$step),
@@ -194,12 +227,13 @@ mod_report_server <- function(id, rv, log_rv) {
     })
 
     output$preview <- shiny::renderUI({
-      shiny::div(class = "omicone-note",
-                 i18n(paste0("No plot for this step. Tick the sections to include, ",
-                             "set a title, then click Download report to save a ",
-                             "narrated HTML summary of your analysis."),
-                      paste0("这一步没有图表。请勾选要包含的章节、设置标题，",
-                             "然后点击“下载报告”以保存一份叙述式的 HTML 分析摘要。")))
+      explain_scene("report",
+                    paste0("No plot for this step. Tick the sections to include, ",
+                             "set a title, then click Download report to save an HTML ",
+                             "record of the steps you ran, their parameters, code and ",
+                             "the R session."),
+                    paste0("这一步没有图表。请勾选要包含的章节、设置标题，",
+                             "然后点击“下载报告”，保存一份记录你运行过的步骤、参数、代码与 R 会话的 HTML 报告。"))
     })
 
     output$download_report <- shiny::downloadHandler(
@@ -208,7 +242,7 @@ mod_report_server <- function(id, rv, log_rv) {
       content = function(file) {
         title   <- if (nzchar(trimws(input$title %||% ""))) input$title
                    else "OmicOne analysis report"
-        entries <- filter_entries(log_rv(), input$sections)
+        entries <- report_entries()
 
         # Prefer a proper rmarkdown render; fall back to a self-contained HTML
         # string if rmarkdown/pandoc is unavailable or rendering fails.

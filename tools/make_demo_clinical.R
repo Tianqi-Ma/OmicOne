@@ -10,8 +10,19 @@
 #   - risk_score is continuous            -> exercises the median / tertile /
 #                                            optimal cutpoint controls
 #   - age is noise                        -> its Cox HR should sit near 1
-# Roughly a third of patients are censored, so the Kaplan-Meier curves get
-# censoring ticks and the median of at least one arm is reached.
+# About 40% of patients are censored (42% with seed 2024: 69 events in 120), so
+# the Kaplan-Meier curves get censoring ticks and the median of at least one
+# arm is reached.
+#
+# This cohort uses its own P001... ids, so it cannot be joined to a MAF. For the
+# WES pipeline, the clinical table that ships with maftools is the demo:
+#   system.file("extdata", "tcga_laml_annot.tsv", package = "maftools")
+# It is loaded automatically with the TCGA LAML demo MAF (Import MAF -> Demo
+# data): 200 patients keyed by Tumor_Sample_Barcode, with FAB_classification,
+# days_to_last_followup and Overall_Survival_Status. Seven of the 200 have no
+# MAF record and 12 have no finite follow-up, which exercises the survival
+# step's "no MAF record = sequenced WT" option (188 patients analysed with it,
+# 182 without).
 
 args <- commandArgs(trailingOnly = TRUE)
 out  <- if (length(args)) args[1] else "demo_clinical.csv"

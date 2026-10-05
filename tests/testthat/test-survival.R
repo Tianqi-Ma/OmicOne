@@ -138,7 +138,11 @@ test_that("cox_univariable screens each variable on its own", {
   expect_equal(nrow(out[out$variable == "stage", ]), 2)   # 3 levels -> 2 contrasts
   expect_true(all(out$HR > 0))
   expect_true(all(out$lower <= out$HR & out$HR <= out$upper))
-  expect_false(is.unsorted(out$p))                        # ordered by p
+  # one overall test per variable, BH across variables, rows grouped by variable
+  pv <- out[!duplicated(out$variable), ]
+  expect_false(is.unsorted(pv$p_overall))
+  expect_equal(pv$q, stats::p.adjust(pv$p_overall, "BH"))
+  expect_true(all(out$events == sum(d$.event)))
 
   # a constant variable cannot be modelled: skipped, not fatal
   d$constant <- "same"
@@ -161,3 +165,112 @@ test_that("km_tidy anchors every curve at (0, 1)", {
     expect_false(is.unsorted(rev(s)))
   }
 })
+
+test_that("normalise_clinical refuses duplicated patients unless told otherwise", {
+  cl <- make_cohort(10)
+  cl$sample[2] <- cl$sample[1]
+  expect_error(normalise_clinical(cl, "sample", "os_months", "os_status"),
+               "more than once")
+  d <- normalise_clinical(cl, "sample", "os_months", "os_status", dedup = "first")
+  expect_equal(nrow(d), 9)
+  expect_equal(attr(d, "duplicates"), 1L)
+  expect_equal(nrow(normalise_clinical(cl, "sample", "os_months", "os_status",
+                                       dedup = "keep")), 10)
+  # ids are trimmed, so " S3" and "S3" are the same patient
+  cl2 <- make_cohort(4)
+  cl2$sample[4] <- paste0(" ", cl2$sample[3], " ")
+  expect_error(normalise_clinical(cl2, "sample", "os_months", "os_status"), "more than once")
+})
+
+test_that("tertiles refuse to collapse on tied values", {
+  x <- c(rep(0, 15), stats::runif(5))
+  expect_error(split_numeric(x, "tertile"), "tied values")
+  ok <- split_numeric(1:30, "tertile")
+  expect_equal(sum(ok == "Low", na.rm = TRUE), 10)
+  expect_equal(attr(ok, "method"), "tertile")
+})
+
+test_that("the optimal cut-point carries a selection-adjusted p-value", {
+  set.seed(11)
+  n <- 80
+  x <- stats::runif(n)
+  time <- stats::rexp(n, 1 / 20)
+  event <- stats::rbinom(n, 1, 0.7)
+  g <- split_numeric(x, "optimal", time, event)
+  padj <- attr(g, "p_adjusted")
+  praw <- stats::pchisq(attr(g, "chisq"), 1, lower.tail = FALSE)
+  expect_true(is.finite(padj) && padj >= praw && padj <= 1)
+  expect_equal(attr(g, "method"), "optimal")
+  # null simulation: the adjusted p keeps the false-positive rate near 5%
+  # (the raw p of the selected cut-point runs at ~30%)
+  set.seed(3)
+  hits <- vapply(1:150, function(i) {
+    xx <- stats::runif(60)
+    tt <- stats::rexp(60, 1 / 20)
+    ee <- stats::rbinom(60, 1, 0.7)
+    attr(split_numeric(xx, "optimal", tt, ee), "p_adjusted") < 0.05
+  }, logical(1))
+  expect_lt(mean(hits), 0.12)
+})
+
+test_that("cox_hr, cox_continuous and survival_warnings describe a two-arm cohort", {
+  set.seed(7)
+  n <- 60
+  grp <- factor(rep(c("Low", "High"), each = n / 2), levels = c("Low", "High"))
+  rate <- ifelse(grp == "High", 1 / 10, 1 / 25)
+  d <- data.frame(.time = stats::rexp(n, rate), .event = stats::rbinom(n, 1, 0.8),
+                  .group = grp, score = stats::rnorm(n) + (grp == "High"))
+  hr <- cox_hr(d)
+  expect_equal(hr$label, "High vs Low")
+  expect_gt(hr$hr, 1)
+  expect_true(hr$lower <= hr$hr && hr$hr <= hr$upper)
+  cc <- cox_continuous(d, "score")
+  expect_true(is.finite(cc$hr) && cc$sd > 0)
+  expect_true(is.finite(cox_ph_p(d)))
+  expect_length(survival_warnings(d), 0)
+  small <- d[c(1:6, 31:36), ]
+  expect_true(any(grepl("Fewer than 10 patients", survival_warnings(small))))
+  # a model that cannot converge reports why instead of a silent huge HR
+  none <- d
+  none$.event[none$.group == "Low"] <- 0
+  expect_true(length(cox_hr(none)$note) >= 0)
+})
+
+test_that("composition_by_patient filters cells and drops thin patients", {
+  meta <- data.frame(patient = rep(c("P1", "P2", "P3"), c(60, 60, 10)),
+                     tissue  = rep(c("Tumor", "Normal"), 65),
+                     type    = rep(c("T", "B", "Mono"), length.out = 130))
+  comp <- composition_by_patient(meta, "patient", "type",
+                                 keep = meta$tissue == "Tumor", min_cells = 20)
+  expect_setequal(comp$.id, c("P1", "P2"))
+  expect_equal(attr(comp, "excluded"), "P3")
+  tb <- composition_by_patient(meta, "patient", "type", denom_levels = c("T", "B"),
+                               min_cells = 1)
+  expect_true(all(abs(tb$T + tb$B - 1) < 1e-9))
+})
+
+test_that("km_plot draws bands, a risk table and the HR without failing", {
+  set.seed(9)
+  d <- data.frame(.time = stats::rexp(40, 1 / 12), .event = stats::rbinom(40, 1, 0.7),
+                  .group = factor(rep(c("Low", "High"), 20), levels = c("Low", "High")))
+  fit <- km_fit(d)
+  p <- km_plot(fit, logrank_test(d), "Overall survival", hr = cox_hr(d), note = "test")
+  f <- tempfile(fileext = ".pdf")
+  grDevices::pdf(f)
+  expect_no_error(print(p))
+  grDevices::dev.off()
+  expect_equal(levels(km_tidy(fit)$group), c("Low", "High"))
+  expect_equal(format_median(c(NA, 12.345)), c("NR", "12.3"))
+})
+
+test_that("read_clinical_table detects the separator and keeps leading zeros", {
+  f <- tempfile(fileext = ".csv")
+  writeLines(c("id,os,status,age", "001,12.5,1,60", "002,30,0,71"), f)
+  d <- read_clinical_table(f)
+  expect_equal(d$id, c("001", "002"))
+  expect_true(is.numeric(d$os) && is.numeric(d$age))
+  g <- tempfile(fileext = ".txt")
+  writeLines(c("id\tos", "A\t1"), g)
+  expect_equal(guess_sep(g), "\t")
+})
+

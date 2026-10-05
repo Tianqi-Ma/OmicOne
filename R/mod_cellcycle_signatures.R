@@ -1,15 +1,21 @@
 #' Module: Cell cycle & signature scoring
 #'
 #' Two related sub-actions on the working object:
-#'  (a) Cell-cycle scoring — adds S.Score, G2M.Score and a Phase call.
-#'  (b) Signature scoring — scores custom or built-in gene sets per cell
-#'      (UCell or Seurat AddModuleScore).
+#'  (a) Cell-cycle scoring -- adds S.Score, G2M.Score and a Phase call
+#'      (Seurat::CellCycleScoring with Seurat's 2019 gene lists).
+#'  (b) Signature scoring -- scores built-in or custom gene sets per cell
+#'      (UCell or Seurat::AddModuleScore), after a gene-coverage check.
 #'
 #' @param id Module id. @param rv shared hub. @param log_rv repro log.
 #' @name mod_cellcycle_signatures
 NULL
 
-#' Built-in example signature gene sets (small, illustrative)
+#' Built-in example signature gene sets (small, illustrative, human symbols)
+#'
+#' Short hand-picked lists for a first look. They are not curated signatures:
+#' for publication use a published set, e.g. MSigDB Hallmark
+#' (HALLMARK_E2F_TARGETS, HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION,
+#' HALLMARK_HYPOXIA, HALLMARK_INFLAMMATORY_RESPONSE), pasted as a custom set.
 #' @keywords internal
 cellcycle_example_sets <- function() {
   list(
@@ -24,60 +30,71 @@ cellcycle_example_sets <- function() {
   )
 }
 
+#' Parse "SetName: GENE1, GENE2" lines into a named list of gene sets
+#' @param txt Text-area value.
+#' @return Named list (names made safe for metadata columns).
+#' @keywords internal
+parse_custom_sets <- function(txt) {
+  if (is.null(txt) || !nzchar(trimws(txt))) return(list())
+  lines <- strsplit(txt, "\n", fixed = TRUE)[[1]]
+  lines <- trimws(lines)
+  lines <- lines[nzchar(lines) & grepl(":", lines, fixed = TRUE)]
+  if (!length(lines)) return(list())
+  nm <- trimws(sub(":.*$", "", lines))
+  genes <- lapply(sub("^[^:]*:", "", lines), parse_genes)
+  keep <- nzchar(nm) & lengths(genes) > 0
+  stats::setNames(genes[keep], safe_set_names(nm[keep]))
+}
+
 #' @rdname mod_cellcycle_signatures
 #' @keywords internal
 mod_cellcycle_signatures_ui <- function(id) {
   ns <- shiny::NS(id)
   sets <- cellcycle_example_sets()
+  labels <- sprintf("%s (illustrative, %d genes)", names(sets), lengths(sets))
   explainer <- explainer_card(
     title = list(en = "Cell cycle & signatures", zh = "细胞周期与信号评分"),
     what = list(
-      en = "Score each cell for its cell-cycle phase and for the activity of gene
-            signatures (e.g. proliferation, EMT, hypoxia, inflammation).",
-      zh = "为每个细胞评估其细胞周期时相，以及基因信号（如增殖、EMT、缺氧、炎症）的活性。"),
+      en = "Score each cell's cell-cycle phase and the activity of gene sets such as
+            proliferation, EMT or hypoxia.",
+      zh = "为每个细胞评定细胞周期时相，以及增殖、EMT、缺氧等基因集的活性。"),
     why  = list(
       en = "Cell-cycle differences can dominate clustering and be mistaken for
-            biology; signature scores turn a curated gene list into a single,
-            comparable per-cell activity value.",
-      zh = "细胞周期差异可能主导聚类并被误认为生物学差异；信号评分将一份精选基因列表
-            转化为单一、可比较的每细胞活性值。"),
+            biology; a signature score turns a gene list into one comparable
+            per-cell value.",
+      zh = "细胞周期差异可能主导聚类并被误认为生物学差异；信号评分把一份基因列表变成一个可比较的单细胞数值。"),
     how  = list(
-      en = "Click <b>Score cell cycle</b> to add S/G2M scores and a Phase call.
-            For signatures, tick built-in sets and/or type your own as
-            <code>SetName: GENE1, GENE2, ...</code> (one per line), pick a method,
-            then <b>Score signatures</b>. <b>UCell</b> is rank-based and robust;
-            <b>AddModuleScore</b> is the Seurat default.",
-      zh = "点击<b>细胞周期评分</b>以添加 S/G2M 分数和 Phase 判定。
-            对于信号评分，勾选内置基因集，和/或按
-            <code>集合名: GENE1, GENE2, ...</code>（每行一个）自定义，选择方法后点击
-            <b>信号评分</b>。<b>UCell</b> 基于排名且稳健；<b>AddModuleScore</b> 为 Seurat 默认。"),
+      en = "<b>Score cell cycle</b> uses Seurat's 2019 S / G2M lists (case-converted
+            for mouse). For signatures tick built-in sets and/or type
+            <code>SetName: GENE1, GENE2, ...</code> per line. Every set needs at
+            least 3 genes present in the data. <b>UCell</b> is rank-based and
+            robust to depth; <b>AddModuleScore</b> is the Seurat default.",
+      zh = "<b>细胞周期评分</b>使用 Seurat 2019 版 S / G2M 基因列表（小鼠数据做大小写转换）。信号评分可勾选内置基因集，和/或按每行 <code>集合名: GENE1, GENE2, ...</code> 输入。每个基因集在数据中至少要有 3 个基因。<b>UCell</b> 基于排名，对测序深度稳健；<b>AddModuleScore</b> 为 Seurat 默认。"),
     read = list(
-      en = "Each cell gets one score per gene set; high scores on the embedding
-            show where a programme is active. A cluster dominated by cell-cycle
-            scores is a cycling state, not a separate cell type.",
-      zh = "每个细胞对每个基因集得到一个分数；嵌入图上的高分区域即该程序活跃的位置。被周期分数主导的簇是一种增殖状态，而非独立的细胞类型。"),
+      en = "Each cell gets one score per set, painted on the embedding; Phase is a
+            categorical call. A cluster dominated by G2M/S scores is a cycling
+            state, not a separate cell type.",
+      zh = "每个细胞对每个基因集得到一个分数，绘制在嵌入图上；Phase 为分类判定。被 G2M/S 分数主导的簇是增殖状态，而不是独立的细胞类型。"),
     example = list(
-      en = "A tumour cluster scoring high on proliferation and hypoxia while
-               cycling in G2M points to an actively growing, oxygen-starved niche.",
-      zh = "某肿瘤簇在增殖和缺氧上得分高且处于 G2M 周期，提示一个活跃增殖、缺氧的微环境。")
+      en = "A tumour cluster high on proliferation and hypoxia and mostly in G2M
+            points to a growing, oxygen-starved niche.",
+      zh = "某肿瘤簇在增殖与缺氧上得分高且大多处于 G2M，提示一个正在生长且缺氧的微环境。")
   )
   controls <- shiny::tagList(
-    # (a) Cell-cycle scoring
     shiny::tags$h6(i18n("1. Cell cycle", "1. 细胞周期")),
     label_with_help("Cell-cycle scoring",
-                    "Uses Seurat's updated 2019 S/G2M gene lists to assign each cell a phase.",
+                    "Seurat::CellCycleScoring with Seurat::cc.genes.updated.2019.",
                     label_zh = "细胞周期评分",
-                    tip_zh = "使用 Seurat 2019 更新的 S/G2M 基因列表为每个细胞分配时相。"),
+                    tip_zh = "使用 Seurat::cc.genes.updated.2019 运行 Seurat::CellCycleScoring。"),
     run_button(ns("run_cc"), "Score cell cycle", "细胞周期评分"),
     shiny::tags$hr(),
-    # (b) Signature scoring
     shiny::tags$h6(i18n("2. Signature scoring", "2. 信号评分")),
     label_with_help("Built-in example sets",
-                    "Curated illustrative gene sets. Tick any to include them.",
+                    "Short illustrative lists (human symbols, case-converted for mouse). For publication paste an MSigDB Hallmark set as a custom set.",
                     label_zh = "内置示例基因集",
-                    tip_zh = "精选的示例基因集。勾选以纳入评分。"),
+                    tip_zh = "简短的示例列表（人类基因符号，小鼠数据做大小写转换）。用于发表时，请把 MSigDB Hallmark 基因集作为自定义集合粘贴进来。"),
     shiny::checkboxGroupInput(ns("builtin"), NULL,
-                              choices = stats::setNames(names(sets), names(sets))),
+                              choices = stats::setNames(names(sets), labels)),
     label_with_help("Custom gene sets",
                     "One set per line, format: SetName: GENE1, GENE2, GENE3",
                     label_zh = "自定义基因集",
@@ -92,11 +109,10 @@ mod_cellcycle_signatures_ui <- function(id) {
                        c("UCell" = "UCell", "AddModuleScore" = "AddModuleScore")),
     run_button(ns("run_sig"), "Score signatures", "信号评分"),
     shiny::tags$hr(),
-    # Preview control
     label_with_help("Preview feature",
-                    "Choose a computed score, or Phase, to display on the embedding.",
+                    "A computed score, or Phase, to display on the embedding.",
                     label_zh = "预览特征",
-                    tip_zh = "选择要在嵌入上显示的评分或 Phase。"),
+                    tip_zh = "选择要在嵌入图上显示的评分或 Phase。"),
     shiny::uiOutput(ns("preview_ui"))
   )
   step_container(title = list(en = "Cell cycle & signatures", zh = "细胞周期与信号评分"),
@@ -104,57 +120,47 @@ mod_cellcycle_signatures_ui <- function(id) {
                                  zh = "为每个细胞评定细胞周期时相与基因集活性。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview"),
-                   guide = list(en = "Per-cell signature scores will be drawn here.",
-                                zh = "运行后，这里将绘制每细胞的信号评分。"),
-                   caption = list(en = "Signature / cell-cycle scores over the embedding.",
-                                  zh = "叠加在嵌入图上的信号 / 细胞周期评分。")))
+                 preview = shiny::tagList(
+                   shiny::uiOutput(ns("insight")),
+                   preview_plot_ui(ns("preview"), download = TRUE,
+                     guide = list(en = "Per-cell scores will be drawn here.",
+                                  zh = "运行后，这里将绘制每个细胞的评分。"),
+                     caption = list(en = "The chosen score (colour) or Phase (category) per cell on the embedding.",
+                                    zh = "所选评分（颜色）或 Phase（类别）在嵌入图上的每细胞分布。"))))
 }
 
 #' @rdname mod_cellcycle_signatures
 #' @keywords internal
 mod_cellcycle_signatures_server <- function(id, rv, log_rv) {
   shiny::moduleServer(id, function(input, output, session) {
-    res <- shiny::reactiveValues(cc_done = FALSE, sig_done = FALSE,
-                                 sets = NULL, method = NULL)
-
-    # Parse the custom textarea into a named list of gene-set vectors.
-    parse_custom_sets <- function(txt) {
-      if (is.null(txt) || !nzchar(trimws(txt))) return(list())
-      lines <- strsplit(txt, "\n", fixed = TRUE)[[1]]
-      out <- list()
-      for (ln in lines) {
-        ln <- trimws(ln)
-        if (!nzchar(ln) || !grepl(":", ln, fixed = TRUE)) next
-        nm <- trimws(sub(":.*$", "", ln))
-        genes <- trimws(strsplit(sub("^[^:]*:", "", ln), ",", fixed = TRUE)[[1]])
-        genes <- genes[nzchar(genes)]
-        if (nzchar(nm) && length(genes) > 0) out[[nm]] <- genes
-      }
-      out
-    }
-
-    # Combine ticked built-in sets with parsed custom sets into one named list.
-    collect_sets <- shiny::reactive({
-      builtin <- cellcycle_example_sets()
-      chosen  <- if (is.null(input$builtin)) list() else builtin[input$builtin]
-      utils::modifyList(chosen, parse_custom_sets(input$custom))
-    })
+    res <- step_results(rv, "sc", cc_done = FALSE, sig_done = FALSE, cc_cov = NULL,
+                        species = NULL, sig_cov = NULL, method = NULL, last = NULL,
+                        run_id = 0L, converted = FALSE)
+    seen_run <- 0L
 
     # (a) Cell-cycle scoring ---------------------------------------------------
     shiny::observeEvent(input$run_cc, {
       shiny::req(rv$obj)
       if (!require_pkgs("Seurat", "Cell-cycle scoring")) return(NULL)
-      obj <- with_progress_notify({
-        sc_cellcycle(rv$obj)
+      species <- guess_species(rv$obj)
+      out <- with_progress_notify({
+        sc_cellcycle(rv$obj, species = species)
       }, message = "Scoring cell cycle (S / G2M / Phase)...")
-      if (is.null(obj)) return(NULL)
-      rv$obj <- obj
+      if (is.null(out)) return(NULL)
+      rv$obj <- out$obj
       res$cc_done <- TRUE
+      res$cc_cov  <- out$coverage
+      res$species <- species
+      res$last    <- "Phase"
+      res$run_id  <- res$run_id + 1L
       mark_done(rv, "cellcycle")
       log_step(log_rv, "Cell-cycle scoring",
-               params = list(),
-               code = "obj <- Seurat::CellCycleScoring(obj, s.features = cc.genes$s.genes, g2m.features = cc.genes$g2m.genes)")
+               params = list(gene_lists = "Seurat::cc.genes.updated.2019", species = species,
+                             S_genes_found = sprintf("%d of %d", out$coverage$n_found[1],
+                                                     out$coverage$n_input[1]),
+                             G2M_genes_found = sprintf("%d of %d", out$coverage$n_found[2],
+                                                       out$coverage$n_input[2])),
+               code = cellcycle_log_code(species))
       shiny::showNotification(
         i18n("Cell-cycle scoring done: S.Score, G2M.Score and Phase added.",
              "细胞周期评分完成：已添加 S.Score、G2M.Score 和 Phase。"),
@@ -164,7 +170,14 @@ mod_cellcycle_signatures_server <- function(id, rv, log_rv) {
     # (b) Signature scoring ----------------------------------------------------
     shiny::observeEvent(input$run_sig, {
       shiny::req(rv$obj)
-      sets <- collect_sets()
+      method <- input$method
+      builtin <- input$builtin
+      custom <- parse_custom_sets(input$custom)
+      species <- guess_species(rv$obj)
+      chosen <- cellcycle_example_sets()[builtin %||% character(0)]
+      converted <- identical(species, "mouse") && length(chosen) > 0
+      if (converted) chosen <- lapply(chosen, mouse_case)
+      sets <- utils::modifyList(chosen, custom)
       if (length(sets) == 0) {
         shiny::showNotification(
           i18n("Select a built-in set or enter a custom gene set first.",
@@ -172,41 +185,66 @@ mod_cellcycle_signatures_server <- function(id, rv, log_rv) {
           type = "warning")
         return(NULL)
       }
-      pkgs <- if (identical(input$method, "UCell")) c("Seurat", "UCell") else "Seurat"
+      cov <- geneset_coverage(sets, rownames(rv$obj))
+      low <- cov[cov$n_found < 3, , drop = FALSE]
+      if (nrow(low)) {
+        txt <- paste(sprintf("%s (%d of %d)", low$set, low$n_found, low$n_input), collapse = ", ")
+        shiny::showNotification(
+          i18n(sprintf("Each gene set needs at least 3 genes in the data. Too few found: %s.", txt),
+               sprintf("每个基因集在数据中至少需要 3 个基因。以下基因集找到的基因太少：%s。", txt)),
+          type = "error", duration = 12)
+        return(NULL)
+      }
+      pkgs <- if (identical(method, "UCell")) c("Seurat", "UCell") else "Seurat"
       if (!require_pkgs(pkgs, "Signature scoring")) return(NULL)
-      method <- input$method
+      features <- stats::setNames(cov$found, cov$set)
       obj <- with_progress_notify({
-        sc_modulescore(rv$obj, features = sets, method = method)
+        sc_modulescore(rv$obj, features = features, method = method)
       }, message = "Scoring gene signatures...")
       if (is.null(obj)) return(NULL)
       rv$obj <- obj
-      res$sig_done <- TRUE
-      res$sets     <- names(sets)
-      res$method   <- method
+      res$sig_done  <- TRUE
+      res$sig_cov   <- cov
+      res$method    <- method
+      res$converted <- converted
+      res$last      <- modulescore_cols(cov$set, method)[1]
+      res$run_id    <- res$run_id + 1L
       mark_done(rv, "cellcycle")
       log_step(log_rv, "Signature scoring",
-               params = list(method = method, sets = names(sets)),
-               code = sprintf(
-                 "obj <- sc_modulescore(obj, features = list(%s), method = '%s')",
-                 paste(names(sets), collapse = ", "), method))
+               params = list(method = method,
+                             coverage = paste(sprintf("%s %d/%d", cov$set, cov$n_found, cov$n_input),
+                                              collapse = "; "),
+                             mouse_case_converted = converted),
+               code = modulescore_log_code(features, method))
+      if (converted) {
+        shiny::showNotification(
+          i18n("Mouse data: built-in human gene sets were converted by case (MKI67 -> Mki67). Check the coverage above the plot.",
+               "小鼠数据：内置的人类基因集已做大小写转换（MKI67 -> Mki67）。请查看图上方的覆盖情况。"),
+          type = "warning", duration = 10)
+      }
       shiny::showNotification(
-        i18n(sprintf("Scored %d signature set(s).", length(sets)),
-             sprintf("已评分 %d 个信号基因集。", length(sets))),
+        i18n(sprintf("Scored %d signature set(s).", length(features)),
+             sprintf("已评分 %d 个信号基因集。", length(features))),
         type = "message")
     })
 
-    # Preview feature choices: Phase (if present) + numeric score columns.
+    # Preview feature choices: Phase / S / G2M and the score columns. After a
+    # run the new column is selected; otherwise the user's choice is kept.
     output$preview_ui <- shiny::renderUI({
       cols <- obj_meta_cols(rv$obj)
-      md   <- obj_meta(rv$obj)
-      score_cols <- cols[grepl("Score|score|_UCell$|Phase", cols)]
-      score_cols <- unique(score_cols)
+      score_cols <- cols[cols %in% c("Phase", "S.Score", "G2M.Score") |
+                           grepl("_UCell$|_AMS$", cols)]
       if (length(score_cols) == 0) {
         return(shiny::div(class = "omicone-placeholder",
                           i18n("Run scoring to enable the preview.",
                                "运行评分以启用预览。")))
       }
-      shiny::selectInput(session$ns("feature"), NULL, choices = score_cols)
+      sel <- keep_selected(shiny::isolate(input$feature), score_cols)
+      if (res$run_id != seen_run && !is.null(res$last) && res$last %in% score_cols) {
+        sel <- res$last
+      }
+      seen_run <<- res$run_id
+      shiny::selectInput(session$ns("feature"), NULL, choices = score_cols, selected = sel)
     })
 
     output$summary <- shiny::renderUI({
@@ -215,37 +253,55 @@ mod_cellcycle_signatures_server <- function(id, rv, log_rv) {
                           i18n("Score the cell cycle and/or gene signatures.",
                                "对细胞周期和/或基因信号进行评分。")))
       }
-      bslib::layout_columns(
-        col_widths = c(4, 4, 4),
+      shiny::tagList(
         stat_tile(i18n("Cell cycle", "细胞周期"),
                   if (isTRUE(res$cc_done)) i18n("Scored", "已评分") else i18n("No", "否")),
         stat_tile(i18n("Signatures", "信号集"),
-                  if (isTRUE(res$sig_done)) length(res$sets) else 0L),
+                  if (isTRUE(res$sig_done)) nrow(res$sig_cov) else 0L),
         stat_tile(i18n("Method", "方法"), res$method %||% "-")
       )
     })
 
-    output$preview <- render_scop_plot(function() {
+    output$insight <- shiny::renderUI({
+      parts_en <- character(0)
+      parts_zh <- character(0)
+      if (isTRUE(res$cc_done)) {
+        cc <- res$cc_cov
+        conv_en <- if (identical(res$species, "mouse")) ", case-converted for mouse" else ""
+        conv_zh <- if (identical(res$species, "mouse")) "，已为小鼠做大小写转换" else ""
+        parts_en <- c(parts_en, sprintf(
+          "Cell cycle: S genes %d of %d and G2M genes %d of %d found (Seurat 2019 lists%s).",
+          cc$n_found[1], cc$n_input[1], cc$n_found[2], cc$n_input[2], conv_en))
+        parts_zh <- c(parts_zh, sprintf(
+          "细胞周期：S 基因找到 %d / %d 个，G2M 基因找到 %d / %d 个（Seurat 2019 列表%s）。",
+          cc$n_found[1], cc$n_input[1], cc$n_found[2], cc$n_input[2], conv_zh))
+      }
+      if (isTRUE(res$sig_done)) {
+        sc <- res$sig_cov
+        cov <- paste(sprintf("%s %d/%d", sc$set, sc$n_found, sc$n_input), collapse = ", ")
+        parts_en <- c(parts_en, sprintf(
+          "%s scores, genes found per set: %s.%s Built-in sets are illustrative, not curated signatures.",
+          res$method, cov,
+          if (isTRUE(res$converted)) " Built-in human sets were case-converted for mouse." else ""))
+        parts_zh <- c(parts_zh, sprintf(
+          "%s 评分，各基因集找到的基因数：%s。%s内置基因集仅为示例，并非经整理的标准签名。",
+          res$method, cov,
+          if (isTRUE(res$converted)) "内置人类基因集已为小鼠做大小写转换。" else ""))
+      }
+      if (!length(parts_en)) return(NULL)
+      insight_bar(paste(parts_en, collapse = " "), paste(parts_zh, collapse = ""))
+    })
+
+    render_step_plot(output, input, "preview", function() {
       obj <- rv$obj
       shiny::req(obj)
       feature <- input$feature
-      shiny::req(feature)
-      if (!require_pkgs("scop", "Score preview")) return(NULL)
-      tryCatch({
-        if (identical(feature, "Phase")) {
-          # Categorical: colour the embedding by cell-cycle phase.
-          sc_dimplot(obj, group_by = "Phase")
-        } else {
-          # Continuous: paint the score onto the embedding.
-          sc_featureplot(obj, features = feature)
-        }
-      }, error = function(e) {
-        shiny::showNotification(
-          i18n(paste("Preview unavailable:", conditionMessage(e)),
-               paste("预览不可用：", conditionMessage(e))),
-          type = "error", duration = 10)
-        NULL
-      })
-    })
+      shiny::req(feature, feature %in% obj_meta_cols(obj))
+      if (identical(feature, "Phase")) {
+        sc_dimplot(obj, group_by = "Phase")
+      } else {
+        sc_featureplot(obj, features = feature)
+      }
+    }, name = "cellcycle_signatures")
   })
 }

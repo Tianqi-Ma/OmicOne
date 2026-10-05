@@ -13,16 +13,23 @@ app_server <- function(input, output, session) {
   # `maf` = maftools MAF, ...) so switching pipelines cannot leave the sidebar
   # reporting the previous pipeline's data. `clinical` is deliberately shared:
   # a cohort loaded once is reused by every pipeline that needs outcome.
+  # `epoch_*`, `ckpt` and the stale entries of `status` are the pipeline-state
+  # bookkeeping described in fct_state.R.
   rv <- shiny::reactiveValues(
     omics = NULL, status = list(),
     obj = NULL, source = NULL,          # single-cell
     maf = NULL, maf_source = NULL,      # WES
-    clinical = NULL                     # shared across omics
+    wes_clin_raw = NULL,                # clinical table as read with the MAF
+    clinical = NULL,                    # shared across omics
+    epoch_sc = 0L, epoch_wes = 0L,
+    ckpt = new.env(parent = emptyenv())
   )
   log_rv <- shiny::reactiveVal(list())
 
   # --- Shared "export current data" (available on every step) ----------------
-  register_exports(input, output, session, rv)
+  register_exports(input, output, session, rv,
+                   omics_items = list(wes = wes_export_items))
+  register_wes_exports(output, rv)
 
   # --- Omics routing ---------------------------------------------------------
   shiny::observeEvent(input$omics, { rv$omics <- input$omics })
@@ -54,10 +61,11 @@ app_server <- function(input, output, session) {
       lab <- phases[[ph]]
       ph_steps <- Filter(function(x) identical(x$phase, ph), steps)
       items <- lapply(ph_steps, function(s) {
-        state <- if (identical(s$v, current)) "current"
-                 else if (isTRUE(status[[s$v]])) "done" else "todo"
+        st <- step_state(rv, s$v)
+        state <- if (identical(s$v, current)) "current" else st
         shiny::tags$a(
-          class = paste("omicone-navitem", state),
+          class = paste("omicone-navitem", state, if (st == "stale") "is-stale"),
+          title = if (st == "stale") "Needs a re-run: an earlier step changed",
           onclick = sprintf("Shiny.setInputValue('goto','%s',{priority:'event'})", s$v),
           shiny::span(class = "omicone-navdot"),
           shiny::span(class = "omicone-navnum", s$n),
@@ -84,41 +92,45 @@ app_server <- function(input, output, session) {
 
   shiny::observeEvent(input$goto, { bslib::nav_select("steps", input$goto) })
 
-  # --- Progress chip (topbar): done/total for the active pipeline ------------
+  # --- Progress chip (topbar): done/total + the next unfinished step ---------
+  # The "next step" link lives here, in the always-visible top bar, rather than
+  # floating over the workspace where it covered the figure-export row.
   output$progress_chip <- shiny::renderUI({
     if (is.null(rv$omics)) return(NULL)
     steps <- steps_for(rv$omics)
     n <- length(steps)
     if (!n) return(NULL)
-    done <- sum(vapply(steps, function(s) isTRUE(rv$status[[s$v]]), logical(1)))
+    keys <- vapply(steps, function(s) s$v, character(1))
+    is_done <- vapply(keys, function(k) step_state(rv, k) == "done", logical(1))
+    done <- sum(is_done)
+    nxt <- NULL
+    cur <- input$steps
+    if (!is.null(cur) && isTRUE(is_done[cur]) && !all(is_done)) {
+      i <- match(cur, keys)
+      undone <- which(!is_done)
+      j <- undone[undone > i][1]
+      if (is.na(j)) j <- undone[1]
+      s <- steps[[j]]
+      nxt <- shiny::tags$a(
+        class = "omicone-nextlink",
+        onclick = sprintf("Shiny.setInputValue('goto','%s',{priority:'event'})", s$v),
+        shiny::span(class = "omicone-next-label", i18n("Next:", "下一步：")),
+        shiny::strong(i18n(s$en, s$zh)), " \u2192")
+    }
     shiny::div(class = "omicone-progress",
                title = i18n("Steps completed", "已完成步骤"),
                shiny::span(class = "omicone-progress-num",
                            sprintf("%d/%d", done, n)),
                shiny::div(class = "omicone-progress-bar",
                           shiny::div(class = "omicone-progress-fill",
-                                     style = sprintf("width:%.0f%%", 100 * done / n))))
+                                     style = sprintf("width:%.0f%%", 100 * done / n))),
+               nxt)
   })
 
-  # --- Floating "next step" chip once the current step is done ---------------
-  output$next_hint <- shiny::renderUI({
+  # --- Banner above the workspace when the current step is stale ------------
+  output$stale_banner <- shiny::renderUI({
     if (is.null(rv$omics)) return(NULL)
-    cur <- input$steps
-    if (is.null(cur) || !isTRUE(rv$status[[cur]])) return(NULL)
-    steps <- steps_for(rv$omics)
-    is_done <- vapply(steps, function(s) isTRUE(rv$status[[s$v]]), logical(1))
-    if (all(is_done)) return(NULL)
-    i <- match(cur, vapply(steps, function(s) s$v, character(1)))
-    undone <- which(!is_done)
-    nxt <- undone[undone > i][1]
-    if (is.na(nxt)) nxt <- undone[1]
-    s <- steps[[nxt]]
-    shiny::tags$a(
-      class = "omicone-nextchip",
-      onclick = sprintf("Shiny.setInputValue('goto','%s',{priority:'event'})", s$v),
-      shiny::span(class = "omicone-next-label", i18n("Next step", "下一步")),
-      shiny::strong(i18n(s$en, s$zh)), "→"
-    )
+    stale_banner(rv, input$steps)
   })
 
   # --- Dataset status (bottom of sidebar), for the active omics --------------
@@ -194,23 +206,4 @@ app_server <- function(input, output, session) {
   ph_ids <- unlist(lapply(c("bulk", "spatial", "integration"),
                           function(o) vapply(steps_for(o), function(s) s$v, character(1))))
   for (pid in ph_ids) mod_placeholder_server(pid, rv, log_rv)
-}
-
-#' NULL-coalescing helper
-#' @keywords internal
-`%||%` <- function(a, b) if (is.null(a)) b else a
-
-#' Mark a pipeline step completed (colours the navigator)
-#' @param rv Shared hub. @param step Step key.
-#' @keywords internal
-mark_done <- function(rv, step) {
-  st <- rv$status; st[[step]] <- TRUE; rv$status <- st; invisible(TRUE)
-}
-
-#' Small labelled status line for the sidebar
-#' @keywords internal
-stat_line <- function(label, value) {
-  shiny::div(class = "omicone-statline",
-             shiny::span(class = "omicone-statlabel", label),
-             shiny::span(class = "omicone-statvalue", value))
 }

@@ -41,7 +41,9 @@ demo_datasets <- function() {
 #' Load a demo dataset, returning a ready object or a (path, format) to import
 #'
 #' @param id Dataset id from [demo_datasets()].
-#' @return list(obj=, path=, format=). Exactly one of obj/path is non-NULL.
+#' @return list(obj=, path=, format=, file=). Exactly one of obj/path is
+#'   non-NULL; `file` is the bundled file name under `inst/extdata` (used by
+#'   the import log to point the script at the same file).
 #' @keywords internal
 fetch_demo <- function(id) {
   ds <- demo_datasets()
@@ -50,7 +52,7 @@ fetch_demo <- function(id) {
   if (id == "bundled") {
     p <- demo_bundled_path()
     if (!nzchar(p) || !file.exists(p)) stop("Bundled demo not found in package.")
-    return(list(obj = NULL, path = p, format = "rds"))
+    return(list(obj = NULL, path = p, format = "rds", file = "demo_pbmc_small.rds"))
   }
 
   if (id == "pbmc3k") {
@@ -58,7 +60,7 @@ fetch_demo <- function(id) {
     # so this loads instantly, offline, with no download and no extra package.
     p <- app_sys("extdata", "pbmc3k.rds")
     if (!nzchar(p) || !file.exists(p)) stop("Bundled pbmc3k not found in package.")
-    return(list(obj = NULL, path = p, format = "rds"))
+    return(list(obj = NULL, path = p, format = "rds", file = "pbmc3k.rds"))
   }
 
   if (id == "pancreas_sub") {
@@ -68,7 +70,7 @@ fetch_demo <- function(id) {
     e <- new.env()
     utils::data("pancreas_sub", package = "scop", envir = e)
     obj <- get("pancreas_sub", envir = e)
-    return(list(obj = obj, path = NULL, format = "object"))
+    return(list(obj = obj, path = NULL, format = "object", file = NULL))
   }
 
   stop("Unhandled demo id: ", id)

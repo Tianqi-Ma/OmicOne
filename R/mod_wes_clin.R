@@ -2,7 +2,7 @@
 #'
 #' Three ways of asking "so what?": which genes are mutated more often in one
 #' clinical group, which known oncogenic pathways the cohort's mutations fall
-#' into, and which mutated genes are druggable.
+#' into, and which mutated genes fall into druggable categories.
 #'
 #' @param id Module id. @param rv shared hub. @param log_rv repro log.
 #' @name mod_wes_clin
@@ -15,63 +15,84 @@ mod_wes_clin_ui <- function(id) {
   explainer <- explainer_card(
     title = list(en = "Clinical / pathway / drug", zh = "临床 / 通路 / 药物"),
     what = list(
-      en = "<b>Enrichment</b> tests every gene against the levels of one clinical
-            variable. <b>Pathways</b> collapses genes into the ten canonical
-            oncogenic pathways. <b>Drugs</b> looks the mutated genes up in a
-            drug-gene interaction database.",
-      zh = "<b>富集</b>针对某个临床变量的各个水平检验每个基因。<b>通路</b>把基因归入十条经典致癌通路。<b>药物</b>在药物-基因相互作用数据库中检索这些突变基因。"),
+      en = "<b>Enrichment</b> tests every frequently mutated gene in each level of
+            one clinical variable against all other samples (Fisher's exact
+            test, BH-adjusted across genes and levels). <b>Pathways</b> collapses
+            genes into the ten canonical oncogenic signalling pathways
+            (Sanchez-Vega 2018). <b>Drugs</b> looks the 20 most mutated genes up
+            in DGIdb's druggable-gene categories.",
+      zh = "<b>富集</b>针对某个临床变量的每个水平，把各高频突变基因与其余全部样本比较（Fisher 精确检验，跨基因与水平做 BH 校正）。<b>通路</b>把基因归入十条经典致癌信号通路（Sanchez-Vega 2018）。<b>药物</b>在 DGIdb 的可成药基因类别中检索突变最多的 20 个基因。"),
     why  = list(
       en = "A gene list is not a finding. Tying mutations to a clinical grouping,
-            to a pathway, or to a drug is what turns the cohort into something you
-            can write about or act on.",
-      zh = "一份基因列表本身不是结论。把突变与临床分组、与通路、或与药物联系起来，才能让这个队列变成可以写进文章、或可据以决策的东西。"),
+            to a pathway, or to a drug category is what turns the cohort into
+            something you can write about — with the multiple-testing burden
+            stated.",
+      zh = "一份基因列表本身不是结论。把突变与临床分组、通路或可成药类别联系起来，才能让这个队列变成可以写进文章的东西——同时要交代多重检验的负担。"),
     how  = list(
-      en = "Enrichment needs a <b>clinical column</b> attached at import — if the
-            dropdown is empty, load a clinical table on the Import step. Pathways
-            and drugs need no clinical data at all.",
-      zh = "富集分析需要在导入时附带<b>临床列</b>——如果下拉框是空的，请在导入步骤加载临床表。通路和药物分析不需要任何临床数据。"),
+      en = "Enrichment needs a <b>clinical column</b> attached at import; only
+            columns with 2–10 levels and at least 3 samples per level are
+            offered. Samples with a missing value are left out. Genes must be
+            mutated in more than <b>minimum mutated samples</b> to be tested.
+            Pathways and drugs need no clinical data.",
+      zh = "富集分析需要在导入时附带<b>临床列</b>；只列出有 2–10 个水平、且每个水平至少 3 个样本的列。取值缺失的样本不纳入。基因的突变样本数需大于<b>最少突变样本数</b>才会被检验。通路与药物分析不需要临床数据。"),
     read = list(
-      en = "<b>Enrichment</b>: one bar per gene whose mutation frequency differs
-            across the clinical groups — the longer the bar, the smaller the
-            p-value; bars past the line survive your cutoff. <b>Pathways</b>:
-            the share of samples hitting each of the ten canonical oncogenic
-            pathways, counting any member gene. <b>Drugs</b>: mutated genes with
-            known drug interactions, ranked by how many compounds target them —
-            the top of that list is where repurposing hypotheses start.",
-      zh = "<b>富集</b>：每根条代表一个突变频率在临床分组间有差异的基因——条越长 p 值越小；超过竖线的基因通过了你的阈值。<b>通路</b>：命中十条经典致癌通路各自的样本占比（任一成员基因命中即计入）。<b>药物</b>：具有已知药物相互作用的突变基因，按对应化合物数量排序——排在前列的就是老药新用假设的起点。"),
+      en = "<b>Enrichment</b>: one bar pair per gene enriched in a group at your
+            FDR (OR > 1 only): the upper bar is the share of that group's
+            samples carrying a mutation, the lower bar the share in all other
+            samples; whiskers are 95% binomial CIs and the labels give the raw
+            counts. <b>Pathways</b>: per pathway, the fraction of its genes that
+            are mutated and the fraction of samples with any mutated member.
+            <b>Drugs</b>: DGIdb druggable categories among the top 20 genes —
+            bar length = number of those genes in the category. This is gene
+            druggability, not a list of approved drugs.",
+      zh = "<b>富集</b>：每个在某组中达到 FDR 阈值且 OR > 1 的基因画一对柱：上方柱为该组样本中携带突变的比例，下方柱为其余样本中的比例；误差线为 95% 二项置信区间，标签给出原始计数。<b>通路</b>：每条通路中被突变的基因比例，以及有任一成员突变的样本比例。<b>药物</b>：前 20 个基因所属的 DGIdb 可成药类别——柱长＝属于该类别的基因数。这表示基因的可成药性，不是已获批药物的清单。"),
     example = list(
-      en = "In TCGA LAML, enrichment on <code>FAB_classification</code> recovers
-               the M3-specific mutation pattern without being told which samples
-               are M3.",
-      zh = "在 TCGA LAML 中，按 <code>FAB_classification</code> 做富集，无需事先告知哪些样本是 M3，就能还原出 M3 特有的突变模式。")
+      en = "In TCGA LAML, enrichment on <code>FAB_classification</code> tests 8
+               levels in the 192 samples with a FAB value; <code>IDH1</code> in M1
+               (11 of 44 vs 7 of 148) and <code>TP53</code> in M7 (3 of 3) are the
+               only hits at FDR < 0.05.",
+      zh = "在 TCGA LAML 中，按 <code>FAB_classification</code> 做富集，在有 FAB 取值的 192 个样本中共检验 8 个水平；只有 M1 中的 <code>IDH1</code>（44 例中 11 例 vs 148 例中 7 例）与 M7 中的 <code>TP53</code>（3 例中 3 例）在 FDR < 0.05 时显著。")
   )
   controls <- shiny::tagList(
     shiny::uiOutput(ns("feat_ui")),
-    label_with_help("Significance cutoff", "Enrichment results at or below this p-value are drawn.",
-                    label_zh = "显著性阈值", tip_zh = "p 值不高于此值的富集结果会被绘制。"),
-    shiny::numericInput(ns("pval"), NULL, value = 0.05, min = 0.001, max = 0.5, step = 0.01),
+    label_with_help("FDR cutoff", "Enrichment results with a BH q-value below this are counted and drawn.",
+                    label_zh = "FDR 阈值", tip_zh = "BH q 值低于此值的富集结果会被计数并绘制。"),
+    shiny::numericInput(ns("fdr"), NULL, value = 0.05, min = 0.001, max = 0.25, step = 0.01),
+    label_with_help("Minimum mutated samples", "A gene is tested only if more than this many samples carry it.",
+                    label_zh = "最少突变样本数", tip_zh = "只有突变样本数大于此值的基因才会被检验。"),
+    shiny::numericInput(ns("min_mut"), NULL, value = 5, min = 1, max = 50, step = 1),
     run_button(ns("run"), "Run analyses", "运行分析")
   )
   step_container(
     title     = list(en = "Clinical / pathway / drug", zh = "临床 / 通路 / 药物"),
-    subtitle  = list(en = "Tie mutations to clinical groups, pathways, and drugs.",
-                     zh = "把突变与临床分组、通路和药物联系起来。"),
+    subtitle  = list(en = "Tie mutations to clinical groups, pathways, and druggable categories.",
+                     zh = "把突变与临床分组、通路和可成药类别联系起来。"),
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = shiny::tagList(
       shiny::uiOutput(ns("insight")),
       bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Clinical enrichment", "临床富集"),
-                       preview_plot_ui(ns("enr"), download = TRUE,
-                                       guide = list(en = "Genes enriched in one clinical group will be drawn here.",
-                                                    zh = "运行后，这里将绘制在某个临床分组中富集的基因。"),
-                                       caption = list(en = "Bar length ∝ −log10(p): how strongly each gene's mutation rate differs across clinical groups.",
-                                                      zh = "条长 ∝ −log10(p)：每个基因的突变频率在临床分组间的差异强度。"))),
-      bslib::nav_panel(i18n("Pathways", "通路"),   preview_plot_ui(ns("path"), download = TRUE)),
-      bslib::nav_panel(i18n("Drugs", "药物"),      preview_plot_ui(ns("drug"), download = TRUE)),
-      bslib::nav_panel(i18n("Enrichment table", "富集结果表"), shiny::uiOutput(ns("tbl_slot")))
-    ))
+        bslib::nav_panel(i18n("Clinical enrichment", "临床富集"),
+                         preview_plot_ui(ns("enr"), download = TRUE,
+                                         guide = list(en = "Genes enriched in one clinical group will be drawn here.",
+                                                      zh = "运行后，这里将绘制在某个临床分组中富集的基因。"),
+                                         caption = list(en = "Bars = share of samples with a mutation in the group (top) versus all other samples (bottom); whiskers = 95% binomial CI; genes at your FDR with OR > 1.",
+                                                        zh = "柱＝该组中携带突变的样本比例（上）对其余样本（下）；误差线＝95% 二项 CI；仅含达到 FDR 阈值且 OR > 1 的基因。"))),
+        bslib::nav_panel(i18n("Pathways", "通路"),
+                         preview_plot_ui(ns("path"), download = TRUE,
+                                         guide = list(en = "The ten oncogenic signalling pathways hit in the cohort will be drawn here.",
+                                                      zh = "运行后，这里将绘制该队列命中的十条致癌信号通路。"),
+                                         caption = list(en = "Per pathway: fraction of its genes mutated (n/N genes) and fraction of samples with any mutated member.",
+                                                        zh = "每条通路：被突变基因的比例（n/N 个基因），以及有任一成员突变的样本比例。"))),
+        bslib::nav_panel(i18n("Drugs", "药物"),
+                         preview_plot_ui(ns("drug"), download = TRUE,
+                                         guide = list(en = "DGIdb druggable categories of the top mutated genes will be drawn here.",
+                                                      zh = "运行后，这里将绘制高频突变基因所属的 DGIdb 可成药类别。"),
+                                         caption = list(en = "DGIdb druggable categories among the 20 most mutated genes; bar = number of genes in the category, label = up to five of them.",
+                                                        zh = "突变最多的 20 个基因所属的 DGIdb 可成药类别；柱＝该类别中的基因数，标签＝其中最多五个基因。"))),
+        bslib::nav_panel(i18n("Enrichment table", "富集结果表"), shiny::uiOutput(ns("tbl_slot")))
+      ))
   )
 }
 
@@ -80,44 +101,92 @@ mod_wes_clin_ui <- function(id) {
 mod_wes_clin_server <- function(id, rv, log_rv) {
   shiny::moduleServer(id, function(input, output, session) {
     ns  <- session$ns
-    res <- shiny::reactiveValues(enr = NULL, feature = NULL, pval = 0.05, ran = FALSE)
+    res <- step_results(rv, "wes", enr = NULL, feature = NULL, fdr = 0.05, ran = FALSE,
+                        path_err = NULL, drug_err = NULL)
+
+    features <- shiny::reactive({
+      shiny::req(rv$maf)
+      cd <- tryCatch(as.data.frame(maftools::getClinicalData(rv$maf)),
+                     error = function(e) NULL)
+      if (is.null(cd)) character(0) else wes_enrichment_features(cd)
+    })
 
     output$feat_ui <- shiny::renderUI({
       shiny::req(rv$maf)
-      cols <- wes_clinical_cols(rv$maf)
+      cols <- features()
       if (!length(cols)) {
         return(shiny::div(class = "omicone-status-empty",
-                          i18n("No clinical columns in this MAF — pathways and drugs still work.",
-                               "该 MAF 无临床列——通路与药物分析仍可运行。")))
+                          i18n("No clinical column with 2–10 levels of at least 3 samples each — pathways and drugs still work.",
+                               "没有水平数为 2–10 且每个水平至少 3 个样本的临床列——通路与药物分析仍可运行。")))
       }
-      shiny::tagList(
-        label_with_help("Clinical feature", "The grouping to test each gene against.",
-                        label_zh = "临床变量", tip_zh = "用于检验每个基因的分组变量。"),
-        shiny::selectInput(ns("feature"), NULL, cols)
-      )
+      wes_col_select(ns, "feature",
+                     label = list(en = "Clinical feature", zh = "临床变量"),
+                     tip = list(en = "Columns with 2–10 levels, each carried by at least 3 samples.",
+                                zh = "水平数为 2–10、且每个水平至少有 3 个样本的列。"),
+                     choices = cols, selected = keep_selected(shiny::isolate(input$feature), cols))
     })
 
     shiny::observeEvent(input$run, {
       shiny::req(rv$maf)
       if (!require_pkgs("maftools", "Clinical / pathway / drug")) return(NULL)
-      res$pval <- input$pval
-      res$ran  <- TRUE
-      res$feature <- input$feature
-      if (!is.null(input$feature) && nzchar(input$feature)) {
-        res$enr <- with_progress_notify(
-          wes_clinical_enrichment(rv$maf, input$feature),
-          message = "Testing clinical enrichment...")
-      } else {
-        res$enr <- NULL
+      maf <- rv$maf
+      feature <- input$feature
+      if (!is.null(feature) && !feature %in% features()) feature <- NULL
+      fdr <- wes_prob(input$fdr, 0.05)
+      min_mut <- wes_int(input$min_mut, 5, lo = 1, hi = 50)
+      enr <- NULL
+      if (!is.null(feature) && nzchar(feature)) {
+        enr <- with_progress_notify(wes_clinical_enrichment(maf, feature, min_mut = min_mut),
+                                    message = "Testing clinical enrichment...")
+        if (is.null(enr)) return(NULL)
       }
+      path_err <- tryCatch({
+        wes_dry_run(function() wes_pathways(maf))
+        NULL
+      }, error = function(e) conditionMessage(e))
+      drug_err <- tryCatch({
+        wes_dry_run(function() maftools::drugInteractions(maf = maf, fontSize = 0.95))
+        NULL
+      }, error = function(e) conditionMessage(e))
+      res$enr <- enr
+      res$feature <- if (!is.null(enr)) feature else NULL
+      res$fdr <- fdr
+      res$path_err <- path_err
+      res$drug_err <- drug_err
+      res$ran <- TRUE
       mark_done(rv, "wes_clin")
+      path_code <- if (exists("pathways", where = asNamespace("maftools"), inherits = FALSE)) {
+        wes_code("maftools::pathways", list(maf = quote(maf), plotType = "bar"))
+      } else {
+        wes_code("maftools:::OncogenicPathways", list(maf = quote(maf)))
+      }
+      enr_code <- if (!is.null(enr)) {
+        c("cd <- as.data.frame(maftools::getClinicalData(maf))",
+          sprintf("anno <- cd[!is.na(cd[[%1$s]]) & nzchar(trimws(as.character(cd[[%1$s]]))), c(\"Tumor_Sample_Barcode\", %1$s)]",
+                  deparse(feature)),
+          wes_code("maftools::clinicalEnrichment",
+                   list(maf = quote(maf), clinicalFeature = feature, annotationDat = quote(anno),
+                        minMut = min_mut), assign = "enr"),
+          sprintf("enr$groupwise_comparision[fdr < %s]   # BH across genes x levels", fdr),
+          "enr_sig <- enr",
+          sprintf("enr_sig$groupwise_comparision <- enr$groupwise_comparision[fdr < %s]", fdr),
+          wes_code("maftools::plotEnrichmentResults",
+                   list(enrich_res = quote(enr_sig), pVal = 0.05)))
+      }
       log_step(log_rv, "WES clinical / pathway / drug",
-               params = list(feature = input$feature %||% "(none)", pvalue = input$pval),
-               code = c(if (!is.null(input$feature) && nzchar(input$feature))
-                          sprintf('enr <- maftools::clinicalEnrichment(maf, clinicalFeature = "%s")',
-                                  input$feature),
-                        'maftools::pathways(maf)',
-                        'maftools::drugInteractions(maf)'))
+               params = list(feature = feature %||% "(none)", fdr = fdr, minMut = min_mut),
+               code = c(enr_code, path_code,
+                        wes_code("maftools::drugInteractions", list(maf = quote(maf)))))
+    })
+
+    stats <- shiny::reactive({
+      shiny::req(res$ran)
+      if (is.null(res$enr)) return(NULL)
+      sig <- wes_enrichment_sig(res$enr, res$fdr)
+      sig$n_used <- attr(res$enr, "n_used")
+      sig$n_missing <- attr(res$enr, "n_missing")
+      sig$levels <- tryCatch(nrow(res$enr$cf_sizes), error = function(e) NA_integer_)
+      sig
     })
 
     output$summary <- shiny::renderUI({
@@ -125,16 +194,12 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
       if (!isTRUE(res$ran)) {
         return(wes_prompt("Click <b>Run analyses</b>.", "点击<b>运行分析</b>。"))
       }
-      n_sig <- tryCatch({
-        d <- as.data.frame(res$enr$groupwise_comparision)
-        sum(d$p_value <= res$pval, na.rm = TRUE)
-      }, error = function(e) NA_integer_)
-      bslib::layout_columns(
-        col_widths = c(4, 4, 4),
+      s <- stats()
+      shiny::tagList(
         stat_tile(i18n("Feature", "临床变量"), res$feature %||% "-"),
-        stat_tile(i18n("Enriched genes", "富集基因数"),
-                  if (is.na(n_sig)) "-" else n_sig),
-        stat_tile(i18n("p cutoff", "p 阈值"), res$pval)
+        stat_tile(i18n("Genes tested", "受检基因数"), if (is.null(s)) "-" else s$tested_genes),
+        stat_tile(sprintf("FDR < %g", res$fdr), if (is.null(s)) "-" else s$sig_genes),
+        stat_tile(i18n("Samples used", "纳入样本数"), if (is.null(s)) "-" else wes_fmt(s$n_used))
       )
     })
 
@@ -142,19 +207,24 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
       if (!isTRUE(res$ran)) return(NULL)
       if (is.null(res$enr)) {
         return(insight_bar(
-          "Pathway and drug analyses are done; no clinical feature was attached, so enrichment testing was skipped.",
-          "通路与药物分析已完成；因未附带临床变量，富集检验被跳过。"))
+          "Pathway and drug look-ups are done; no clinical feature was selected, so enrichment testing was skipped.",
+          "通路与药物检索已完成；未选择临床变量，因此跳过了富集检验。"))
       }
-      n_sig <- tryCatch({
-        d <- as.data.frame(res$enr$groupwise_comparision)
-        sum(d$p_value <= res$pval, na.rm = TRUE)
-      }, error = function(e) NA_integer_)
-      if (is.na(n_sig)) return(NULL)
+      s <- stats()
+      miss_en <- if (isTRUE(s$n_missing > 0)) sprintf(" %d sample(s) with a missing %s were left out.",
+                                                      s$n_missing, res$feature) else ""
+      miss_zh <- if (isTRUE(s$n_missing > 0)) sprintf("%d 个 %s 缺失的样本未纳入。",
+                                                      s$n_missing, res$feature) else ""
+      genes_txt <- if (length(s$genes)) {
+        paste0(": ", paste(utils::head(s$genes, 5), collapse = ", "))
+      } else ""
+      n_tests <- nrow(wes_enrichment_table(res$enr))
       insight_bar(
-        sprintf("<b>%d</b> genes differ across <b>%s</b> at p ≤ %g. The <b>Pathways</b> tab shows which canonical pathways the cohort hits; <b>Drugs</b> ranks repurposing candidates.",
-                n_sig, res$feature, res$pval),
-        sprintf("<b>%d</b> 个基因在 <b>%s</b> 各组间的突变频率不同（p ≤ %g）。<b>通路</b>页签展示队列命中的经典通路；<b>药物</b>页签列出老药新用候选。",
-                n_sig, res$feature, res$pval))
+        sprintf("<b>%d</b> of %d tested genes are enriched in at least one level of <b>%s</b> at FDR < %g (BH over %d gene × level tests)%s. Each level is compared with all other samples; small levels give wide CIs.%s",
+                s$sig_genes, s$tested_genes, res$feature, res$fdr, n_tests, genes_txt, miss_en),
+        sprintf("%d 个受检基因中有 <b>%d</b> 个在 <b>%s</b> 的至少一个水平中富集（FDR < %g，对 %d 个基因 × 水平检验做 BH 校正）%s。每个水平均与其余全部样本比较；样本少的水平置信区间很宽。%s",
+                s$tested_genes, s$sig_genes, res$feature, res$fdr, n_tests,
+                sub("^: ", "：", genes_txt), miss_zh))
     })
 
     draw_enr <- with_text_boost(function() {
@@ -162,7 +232,16 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
       if (is.null(res$enr)) {
         stop("No clinical feature selected. Attach a clinical table on the Import step to use this tab.")
       }
-      maftools::plotEnrichmentResults(enrich_res = res$enr, pVal = res$pval)
+      s <- stats()
+      if (!nrow(s$drawn)) {
+        stop(sprintf("No gene is enriched (OR > 1) in any level at FDR < %g. The Enrichment table lists every test.",
+                     res$fdr))
+      }
+      sub <- res$enr
+      sub$groupwise_comparision <- data.table::as.data.table(s$sig)
+      # pVal fixed at 0.05: maftools also uses it as the CI alpha, so the
+      # whiskers stay 95% whatever FDR cutoff the user chose
+      maftools::plotEnrichmentResults(enrich_res = sub, pVal = 0.05)
     })
     output$enr <- render_base_plot(draw_enr)
     register_figure_download(output, input, "enr", draw_enr, "wes_enrichment",
@@ -170,6 +249,7 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
 
     draw_path <- with_text_boost(function() {
       shiny::req(rv$maf, res$ran)
+      if (!is.null(res$path_err)) stop(res$path_err)
       wes_pathways(rv$maf)
     })
     output$path <- render_base_plot(draw_path)
@@ -178,31 +258,27 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
 
     draw_drug <- with_text_boost(function() {
       shiny::req(rv$maf, res$ran)
-      maftools::drugInteractions(maf = rv$maf, fontSize = 0.95)
+      if (!is.null(res$drug_err)) stop(res$drug_err)
+      invisible(maftools::drugInteractions(maf = rv$maf, fontSize = 0.95))
     })
     output$drug <- render_base_plot(draw_drug)
     register_figure_download(output, input, "drug", draw_drug, "wes_drugs",
                              width = 10, height = 8)
 
-    output$tbl_slot <- shiny::renderUI({
-      if (is.null(res$enr)) return(wes_no_maf())
-      if (has_pkg("DT")) DT::dataTableOutput(ns("tbl"))
-      else shiny::verbatimTextOutput(ns("tbl_txt"))
-    })
     view <- shiny::reactive({
       shiny::req(res$enr)
-      df <- as.data.frame(res$enr$groupwise_comparision)
+      df <- wes_enrichment_table(res$enr)
       num <- vapply(df, is.numeric, logical(1))
       df[num] <- lapply(df[num], function(x) signif(x, 3))
-      if ("p_value" %in% colnames(df)) df <- df[order(df$p_value), , drop = FALSE]
       df
     })
-    if (has_pkg("DT")) {
-      output$tbl <- DT::renderDataTable(
-        DT::datatable(view(), rownames = FALSE, filter = "top",
-                      options = list(pageLength = 15, scrollX = TRUE)))
-    } else {
-      output$tbl_txt <- shiny::renderPrint(utils::head(view(), 20))
-    }
+    tb <- wes_table(ns, "tbl", view, "wes_clinical_enrichment",
+                    has_maf = function() !is.null(rv$maf),
+                    ready = function() !is.null(res$enr),
+                    not_ready = list(en = "Select a clinical feature and run this step to show the enrichment table.",
+                                     zh = "选择临床变量并运行本步骤后显示富集结果表。"))
+    output$tbl_slot <- tb$slot
+    output$tbl <- tb$table
+    output$tbl_dl <- tb$download
   })
 }

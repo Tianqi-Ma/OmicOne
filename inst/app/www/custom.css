@@ -1,9 +1,23 @@
 /* ============================================================================
-   OmicOne — blue-cyan research theme. Dark by default, light via toggle.
+   OmicOne — blue-cyan research theme. Follows the OS light/dark preference;
+   the top-bar toggle switches it for the session. Light is the fallback.
    ========================================================================== */
 
 /* ---- design tokens ---- */
-:root, [data-bs-theme="dark"] {
+:root, [data-bs-theme="light"] {
+  --sc-bg:      #f4f6f9;
+  --sc-panel:   #f7f9fb;
+  --sc-card:    #ffffff;
+  --sc-border:  #e3e7ed;
+  --sc-text:    #1c2530;
+  --sc-muted:   #66727f;
+  --sc-accent:  #2f81c7;
+  --sc-accent2: #2669a8;
+  --sc-ok:      #2f9e6d;
+  --sc-warn:    #b7791f;
+  --sc-elev:    0 1px 3px rgba(16,24,40,.07);
+}
+[data-bs-theme="dark"] {
   --sc-bg:      #0f141a;
   --sc-panel:   #141b23;
   --sc-card:    #1b2530;
@@ -13,19 +27,8 @@
   --sc-accent:  #2f81c7;
   --sc-accent2: #4f9fd0;
   --sc-ok:      #3fb37f;
+  --sc-warn:    #e0a43a;
   --sc-elev:    0 1px 3px rgba(0,0,0,.35);
-}
-[data-bs-theme="light"] {
-  --sc-bg:      #ffffff;
-  --sc-panel:   #f7f9fb;
-  --sc-card:    #ffffff;
-  --sc-border:  #e6e9ee;
-  --sc-text:    #1c2530;
-  --sc-muted:   #6b7785;
-  --sc-accent:  #2f81c7;
-  --sc-accent2: #2669a8;
-  --sc-ok:      #2f9e6d;
-  --sc-elev:    0 1px 3px rgba(0,0,0,.06);
 }
 
 body { background: var(--sc-bg); color: var(--sc-text); }
@@ -47,10 +50,6 @@ body { background: var(--sc-bg); color: var(--sc-text); }
 }
 .omicone-lang-btn.active { background: var(--sc-accent); color: #fff; }
 
-/* python-env status dot */
-.omicone-pydot { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; color: var(--sc-muted); }
-.omicone-pydot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--sc-muted); }
-.omicone-pydot.ready::before { background: var(--sc-ok); }
 
 /* ---- left grouped stepper (collapsible phase groups) ---- */
 .omicone-nav { display: flex; flex-direction: column; gap: 1px; padding-right: 2px; }
@@ -92,6 +91,21 @@ body { background: var(--sc-bg); color: var(--sc-text); }
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc-accent) 30%, transparent);
 }
 .omicone-navlabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* finished, but an upstream step was re-run since: hollow amber dot */
+.omicone-navitem.is-stale .omicone-navdot {
+  background: transparent; border-color: var(--sc-warn); box-shadow: none;
+}
+.omicone-navitem.stale { color: var(--sc-text); }
+
+/* ---- stale banner above the workspace ---- */
+.omicone-stalebar {
+  display: flex; align-items: center; gap: .55rem; margin-bottom: .6rem;
+  padding: .5rem .85rem; font-size: .85rem; line-height: 1.45;
+  color: var(--sc-text); border-radius: .45rem;
+  background: color-mix(in srgb, var(--sc-warn) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sc-warn) 45%, transparent);
+}
+.omicone-stalebar .fa, .omicone-stalebar svg { color: var(--sc-warn); flex: 0 0 auto; }
 
 /* ---- step header ---- */
 .omicone-headwrap { width: 100%; }
@@ -272,19 +286,18 @@ body { background: var(--sc-bg); color: var(--sc-text); }
   transition: width .3s ease;
 }
 
-/* ---- next-step chip (floating, bottom-right) ---- */
-.omicone-nextchip {
-  position: fixed; right: 1.4rem; bottom: 1.2rem; z-index: 60;
-  display: inline-flex; align-items: baseline; gap: .4rem;
-  padding: .5rem .95rem; border-radius: 999px; cursor: pointer; text-decoration: none;
-  background: var(--sc-card);
-  border: 1px solid color-mix(in srgb, var(--sc-accent) 55%, transparent);
-  color: var(--sc-text); font-size: .85rem; box-shadow: var(--sc-elev);
-  animation: omicone-rise .25s ease; transition: transform .15s ease, border-color .15s ease;
+/* ---- "next step" link inside the progress chip ---- */
+.omicone-nextlink {
+  display: inline-flex; align-items: baseline; gap: .3rem; margin-left: .35rem;
+  padding: .12rem .6rem; border-radius: 999px; cursor: pointer; text-decoration: none;
+  font-size: .8rem; color: var(--sc-text);
+  border: 1px solid color-mix(in srgb, var(--sc-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--sc-accent) 8%, transparent);
+  animation: omicone-rise .25s ease; transition: border-color .15s ease, background .15s ease;
 }
-.omicone-nextchip:hover { border-color: var(--sc-accent); transform: translateY(-2px); }
-.omicone-nextchip .omicone-next-label { color: var(--sc-muted); font-size: .78rem; }
-@keyframes omicone-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.omicone-nextlink:hover { border-color: var(--sc-accent); background: color-mix(in srgb, var(--sc-accent) 16%, transparent); color: var(--sc-text); }
+.omicone-nextlink .omicone-next-label { color: var(--sc-muted); }
+@keyframes omicone-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
 /* ---- insight bar (auto result summary, above the preview) ---- */
 .omicone-insight {
@@ -314,3 +327,49 @@ body { background: var(--sc-bg); color: var(--sc-text); }
 .omicone-fig-dl .form-control { padding: .25rem .45rem; font-size: .82rem; height: auto; }
 .omicone-fig-dl-dpi { display: flex; align-items: center; gap: .3rem; }
 .omicone-fig-dl-unit { font-size: .75rem; color: var(--sc-muted); }
+
+/* ---- figures in dark mode ----
+   Plots are rendered on white (publication-ready, and what the downloaded file
+   looks like). In dark mode, frame them as a sheet of paper on the canvas
+   instead of letting a bright rectangle bleed into the chrome. */
+[data-bs-theme="dark"] .omicone-plotwrap .shiny-plot-output img {
+  border-radius: .45rem; box-shadow: 0 0 0 1px var(--sc-border);
+}
+
+/* ---- "not run yet" hint in the header strip ----
+   Modules reuse .omicone-placeholder for the summary slot; in the header it
+   must stay a slim muted line, not a padded dashed box that doubles the
+   header's height before the first run. */
+.omicone-summarystrip .omicone-placeholder {
+  padding: .1rem 0; border: 0; background: none; text-align: right;
+  font-size: .78rem; font-style: italic;
+}
+
+/* ---- table download row (above a capped results table) ---- */
+.omicone-tbl-dl {
+  display: flex; align-items: center; justify-content: flex-end; gap: .6rem;
+  margin: 0 0 .4rem; font-size: .8rem; color: var(--sc-muted);
+}
+.omicone-tbl-dl .btn { line-height: 1.2; white-space: nowrap; }
+
+/* ---- step explainer animations (explain*.js) ----
+   Each step's empty preview shows a short looping scene of what the step
+   does; it steps aside with the guide once the real plot renders. */
+canvas.omicone-explain {
+  display: block; width: min(100%, 620px); height: auto; aspect-ratio: 56 / 26;
+}
+.omicone-preview-guide.has-scene .omicone-explain-fallback { display: none; }
+.omicone-preview-guide.has-scene { gap: .55rem; padding-top: 1rem; }
+.omicone-explain-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: .6rem;
+  padding: 1.2rem 1rem; color: var(--sc-muted); text-align: center;
+}
+.omicone-explain-wrap .omicone-preview-guide-text { max-width: 36rem; font-size: .88rem; line-height: 1.55; }
+
+/* ---- motion: a step fades in when you open it; new insights rise in ---- */
+@keyframes omicone-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.tab-pane.active > .omicone-step, .tab-pane.active > .bslib-card.omicone-step { animation: omicone-fade .22s ease both; }
+.omicone-insight { animation: omicone-rise .3s ease both; }
+@media (prefers-reduced-motion: reduce) {
+  .tab-pane.active > .omicone-step, .omicone-insight, .omicone-nextlink { animation: none; }
+}

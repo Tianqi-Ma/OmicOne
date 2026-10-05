@@ -39,7 +39,12 @@ expected_blank <- function(e) {
 module_output_ids <- function(server_fn) {
   src <- paste(deparse(body(server_fn)), collapse = "\n")
   ids <- regmatches(src, gregexpr("output\\$[A-Za-z0-9_.]+", src))[[1]]
-  unique(sub("^output\\$", "", ids))
+  ids <- sub("^output\\$", "", ids)
+  # plots registered through render_step_plot(output, input, "<id>", ...)
+  # assign output[[id]] (and its "<id>_dl" download) inside the helper
+  reg <- regmatches(src, gregexpr('render_step_plot\\(output, input, "[^"]+"', src))[[1]]
+  reg <- sub('.*"([^"]+)"$', "\\1", reg)
+  unique(c(ids, reg))
 }
 
 # Evaluate every output of a module server, collecting only unexpected errors.

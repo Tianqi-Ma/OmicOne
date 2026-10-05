@@ -28,10 +28,13 @@ mod_import_ui <- function(id) {
       zh = "<b>只是想体验一下？</b>选择<b>演示数据</b>并点击加载，几秒内即可试用整个流程。要使用自己的数据，
             请选择<b>上传文件</b>并选中与之匹配的格式（如果是已保存的 Seurat 对象则选 RDS）。"),
     read = list(
-      en = "The overview shows cells, genes, and counts per cell — a first
-            sanity check that the matrix loaded the right way round (genes in
-            rows) and the numbers are in the expected ballpark.",
-      zh = "总览展示细胞数、基因数与每细胞计数——第一项合理性检查：确认矩阵方向正确（基因为行）、数量级符合预期。"),
+      en = "The overview is drawn once, at import, and does not change when
+            later steps filter cells: violins of UMIs, genes and mitochondrial
+            % per cell, the 20 genes taking the largest share of all counts,
+            and UMIs against genes per cell. Check the matrix loaded the right
+            way round (genes in rows) and the numbers are in the expected
+            ballpark.",
+      zh = "总览在导入时绘制一次，之后的步骤过滤细胞也不会改变它：每细胞 UMI、基因数与线粒体比例的小提琴图，占总计数比例最高的 20 个基因，以及每细胞 UMI 与基因数的散点图。请确认矩阵方向正确（基因为行）、数量级符合预期。"),
     example = list(
       en = "The bundled demo loads instantly with no download. Or upload
                <code>pbmc.rds</code> (a Seurat object), a 10x <code>.h5</code>, or a
@@ -57,9 +60,9 @@ mod_import_ui <- function(id) {
     shiny::conditionalPanel(
       sprintf("input['%s'] == 'demo'", ns("source")),
       label_with_help("Demo dataset",
-                      "The bundled example loads instantly offline. The 10x PBMC sets are real data and download the first time (needs internet).",
+                      "PBMC 3k (real 10x data) and the tiny example ship with the app and load offline. The pancreas demo needs the scop package.",
                       label_zh = "演示数据集",
-                      tip_zh = "内置示例可离线即时加载。10x PBMC 数据集是真实数据，首次使用需下载（需要联网）。"),
+                      tip_zh = "PBMC 3k（真实 10x 数据）和小型示例随应用附带，可离线加载。胰腺演示数据需要安装 scop 包。"),
       shiny::selectInput(ns("demo_id"), NULL, choices = demo_choices, selected = "pbmc3k"),
       shiny::helpText(shiny::textOutput(ns("demo_desc"), inline = TRUE)),
       run_button(ns("load_demo"), "Load demo data", "加载演示数据")
@@ -79,10 +82,14 @@ mod_import_ui <- function(id) {
                          selected = "rds"),
       shiny::conditionalPanel(
         sprintf("input['%s'] == 'table'", ns("fmt")),
-        label_with_help("Separator", "How columns are separated in your table.",
-                        label_zh = "分隔符", tip_zh = "表格中各列之间的分隔方式。"),
+        label_with_help("Separator",
+                        "How columns are separated. Auto reads .csv as comma-separated and .tsv/.txt as tab-separated.",
+                        label_zh = "分隔符",
+                        tip_zh = "表格中各列之间的分隔方式。自动：.csv 按逗号，.tsv/.txt 按制表符读取。"),
         shiny::selectInput(ns("sep"), NULL,
-                           choices = c("Tab" = "\t", "Comma" = ","), selected = "\t")
+                           choices = c("Auto (from file name)" = "auto", "Tab" = "\t",
+                                       "Comma" = ","),
+                           selected = "auto")
       ),
       shiny::fileInput(ns("file"), i18n("Choose file", "选择文件"),
                        accept = c(".rds", ".h5", ".csv", ".tsv", ".txt", ".gz")),
@@ -114,13 +121,16 @@ mod_import_ui <- function(id) {
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
     preview   = bslib::navset_card_tab(
-      bslib::nav_panel(i18n("Overview", "总览"),        preview_plot_ui(ns("ov_plot"),
-        guide = list(en = "An overview of the loaded dataset will be drawn here.",
-                     zh = "运行后，这里将绘制已载入数据集的总览。"),
-        caption = list(en = "Dataset overview: cells, genes, and counts-per-cell distributions.",
-                       zh = "数据总览：细胞数、基因数与每细胞计数分布。"))),
-      bslib::nav_panel(i18n("Cell metadata", "细胞元数据"), tbl_out(ns("meta_tbl"))),
-      bslib::nav_panel(i18n("Counts preview", "表达矩阵预览"), tbl_out(ns("counts_tbl")))
+      bslib::nav_panel(i18n("Overview (at import)", "总览（导入时）"),
+                       preview_plot_ui(ns("ov_plot"), download = TRUE,
+        guide = list(en = "An overview of the dataset as imported will be drawn here.",
+                     zh = "运行后，这里将绘制导入时数据集的总览。"),
+        caption = list(en = "As imported, before any filtering: per-cell QC violins, top genes by share of counts, UMIs vs genes (one point = one cell).",
+                       zh = "导入时、任何过滤之前的数据：每细胞 QC 小提琴图、按计数占比排序的头部基因、UMI 与基因数散点（每个点为一个细胞）。"))),
+      bslib::nav_panel(i18n("Cell metadata (current)", "细胞元数据（当前）"),
+                       tbl_out(ns("meta_tbl"))),
+      bslib::nav_panel(i18n("Counts preview (current)", "表达矩阵预览（当前）"),
+                       tbl_out(ns("counts_tbl")))
     )
   )
 }
@@ -140,76 +150,101 @@ mod_import_server <- function(id, rv, log_rv, parent = NULL) {
       if (nrow(row)) row$description else ""
     })
 
+    # Overview of the dataset as imported (the import module is the documented
+    # exception to step_results(): its own epoch bump would wipe it).
+    snap <- shiny::reactiveVal(NULL)
+
+    # Put a freshly built object into the hub, start a new epoch, and log the
+    # exact code that rebuilds it.
+    commit <- function(obj, source_label, log_params, code) {
+      start_epoch(rv, "sc", log_rv)
+      rv$obj <- obj
+      rv$source <- source_label
+      snap(list(ov = data_overview(obj),
+                plot = tryCatch(overview_plots(obj, when = "at import"),
+                                error = function(e) NULL)))
+      mark_done(rv, "import")
+      log_step(log_rv, "Import", params = log_params, code = code)
+      shiny::showNotification(i18n("Data loaded.", "数据已加载。"), type = "message")
+    }
+
+    # What was read, for the log: the object family decides the rebuild code.
+    import_kind <- function(loaded, fmt) {
+      if (fmt %in% c("h5", "table")) return(fmt)
+      if (methods::is(loaded, "Seurat")) return("seurat")
+      if (methods::is(loaded, "SingleCellExperiment")) return("sce")
+      "matrix"
+    }
+
     # Shared loader: read a file of a given format -> Seurat object -> hub.
-    load_into_hub <- function(path, fmt, sep = "\t", source_label = fmt,
-                              log_params = list(), log_file = basename(path)) {
+    load_into_hub <- function(path, fmt, sep = "auto", file_name = basename(path),
+                              source_label = fmt, log_params = list(),
+                              demo_file = NULL) {
       if (!require_pkgs(c("Seurat", "SeuratObject"), "Import")) return(invisible(NULL))
-      obj <- with_progress_notify({
+      sep_used <- if (identical(sep, "auto")) guess_table_sep(file_name) else sep
+      got <- with_progress_notify({
         loaded <- switch(
           fmt,
           rds   = readRDS(path),
           h5    = Seurat::Read10X_h5(path),
-          table = read_counts_table(path, sep = sep)
+          table = read_counts_table(path, sep = sep_used)
         )
-        as_seurat(loaded)
+        kind <- import_kind(loaded, fmt)
+        list(obj = as_seurat(loaded), kind = kind)
       }, message = "Loading and building object...")
-      if (is.null(obj)) return(invisible(NULL))
-      rv$obj    <- obj
-      rv$source <- source_label
-      mark_done(rv, "import")
-      log_step(log_rv, "Import",
-               params = log_params,
-               code = sprintf('obj <- %s',
-                              switch(fmt,
-                                     rds   = sprintf('readRDS("%s")', log_file),
-                                     h5    = sprintf('Seurat::Read10X_h5("%s")', log_file),
-                                     table = sprintf('read.delim("%s", row.names=1)', log_file))))
-      shiny::showNotification(i18n("Data loaded.", "数据已加载。"), type = "message")
+      if (is.null(got)) return(invisible(NULL))
+      code <- import_log_code(got$kind,
+                              actions = obj_misc(got$obj, "omicone_import_actions") %||% character(0),
+                              sep = sep_used, file = file_name, demo_file = demo_file)
+      if (identical(fmt, "table")) log_params$sep <- sep_used
+      commit(got$obj, source_label, log_params, code)
     }
 
     # (a) Upload
     shiny::observeEvent(input$load, {
       shiny::req(input$file)
-      load_into_hub(input$file$datapath, input$fmt, sep = input$sep,
-                    source_label = switch(input$fmt, rds = "RDS", h5 = "10x .h5", table = "Table"),
-                    log_params = list(source = "upload", format = input$fmt, file = input$file$name),
-                    log_file = input$file$name)
+      fmt <- input$fmt
+      file <- input$file
+      load_into_hub(file$datapath, fmt, sep = input$sep, file_name = file$name,
+                    source_label = switch(fmt, rds = "RDS", h5 = "10x .h5", table = "Table"),
+                    log_params = list(source = "upload", format = fmt, file = file$name))
     })
 
     # (b) Demo data
     shiny::observeEvent(input$load_demo, {
-      got <- tryCatch(fetch_demo(input$demo_id),
-                      error = function(e) { shiny::showNotification(conditionMessage(e), type = "error", duration = 12); NULL })
+      id <- input$demo_id
+      got <- tryCatch(fetch_demo(id), error = function(e) {
+        shiny::showNotification(conditionMessage(e), type = "error", duration = 12)
+        NULL
+      })
       shiny::req(got)
       nm <- demo_datasets()
-      label <- nm$name[nm$id == input$demo_id]
+      label <- nm$name[nm$id == id]
       if (!is.null(got$obj)) {
-        # Demo already a Seurat/SCE object (pbmc3k, pancreas_sub): load directly.
+        # Demo shipped as an object (pancreas_sub from scop): load directly.
         if (!require_pkgs(c("Seurat", "SeuratObject"), "Import")) return(NULL)
         obj <- with_progress_notify(as_seurat(got$obj), message = "Loading demo...")
         if (is.null(obj)) return(NULL)
-        rv$obj <- obj
-        rv$source <- paste0("Demo: ", label)
-        mark_done(rv, "import")
-        log_step(log_rv, "Import",
-                 params = list(source = "demo", demo = input$demo_id),
-                 code = sprintf('obj <- %s', nm$source[nm$id == input$demo_id]))
-        shiny::showNotification("Demo data loaded.", type = "message")
+        code <- import_log_code("scop_demo",
+                                actions = obj_misc(obj, "omicone_import_actions") %||% character(0))
+        commit(obj, paste0("Demo: ", label), list(source = "demo", demo = id), code)
       } else {
-        load_into_hub(got$path, got$format,
+        load_into_hub(got$path, got$format, file_name = got$file,
                       source_label = paste0("Demo: ", label),
-                      log_params = list(source = "demo", demo = input$demo_id),
-                      log_file = paste0("demo_", input$demo_id))
+                      log_params = list(source = "demo", demo = id),
+                      demo_file = got$file)
       }
     })
 
     # (c) From URL
     shiny::observeEvent(input$load_url, {
-      shiny::req(nzchar(input$url))
-      ext <- if (input$url_fmt == "h5") ".h5" else ".rds"
+      url <- input$url
+      fmt <- input$url_fmt
+      shiny::req(nzchar(url))
+      ext <- if (fmt == "h5") ".h5" else ".rds"
       dest <- tempfile(fileext = ext)
       ok <- with_progress_notify(
-        tryCatch(utils::download.file(input$url, dest, mode = "wb", quiet = TRUE) == 0,
+        tryCatch(utils::download.file(url, dest, mode = "wb", quiet = TRUE) == 0,
                  error = function(e) FALSE),
         message = "Downloading...")
       if (!isTRUE(ok) || !file.exists(dest) || file.size(dest) == 0) {
@@ -218,10 +253,8 @@ mod_import_server <- function(id, rv, log_rv, parent = NULL) {
                                 type = "error", duration = 12)
         return(NULL)
       }
-      load_into_hub(dest, input$url_fmt,
-                    source_label = "URL",
-                    log_params = list(source = "url", url = input$url, format = input$url_fmt),
-                    log_file = basename(input$url))
+      load_into_hub(dest, fmt, file_name = basename(url), source_label = "URL",
+                    log_params = list(source = "url", url = url, format = fmt))
     })
 
     output$summary <- shiny::renderUI({
@@ -231,11 +264,10 @@ mod_import_server <- function(id, rv, log_rv, parent = NULL) {
                           i18n("No data yet. Tip: pick <b>Demo data</b> and click <b>Load demo data</b> to try it instantly.",
                                "尚无数据。提示：选择<b>演示数据</b>并点击<b>加载演示数据</b>即可立即试用。")))
       }
-      ov <- data_overview(obj)
+      ov <- snap()$ov %||% data_overview(obj)
       fmt <- function(x) if (is.na(x)) "-" else format(round(x), big.mark = ",")
-      shiny::div(
-        class = "omicone-summarystrip",
-        stat_tile(i18n("Cells", "细胞"), fmt(ov$cells)),
+      shiny::tagList(
+        stat_tile(i18n("Cells at import", "导入细胞数"), fmt(ov$cells)),
         stat_tile(i18n("Genes", "基因"), fmt(ov$genes)),
         stat_tile(i18n("Median genes/cell", "中位基因/细胞"), fmt(ov$median_genes)),
         stat_tile(i18n("Median UMIs/cell", "中位UMI/细胞"), fmt(ov$median_umi)),
@@ -243,11 +275,14 @@ mod_import_server <- function(id, rv, log_rv, parent = NULL) {
       )
     })
 
-    # Overview tab: pre-QC survey plots (violins + top genes + count scatter).
-    output$ov_plot <- render_scop_plot(function() {
+    # Overview tab: the survey drawn at import (falls back to the current
+    # object, labelled as such, if the data did not come through this module).
+    render_step_plot(output, input, "ov_plot", function() {
       shiny::req(rv$obj)
-      overview_plots(rv$obj)
-    })
+      p <- snap()$plot
+      if (!is.null(p)) return(p)
+      overview_plots(rv$obj, when = "current object")
+    }, name = "import_ov_plot")
 
     # Cell metadata tab: the real per-cell metadata table.
     output$meta_tbl <- render_tbl_wrap(function() {

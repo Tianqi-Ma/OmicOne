@@ -4,6 +4,10 @@
 #' @keywords internal
 NULL
 
+#' NULL-coalescing helper (base R has it only from 4.4)
+#' @keywords internal
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
 #' Check that suggested packages are installed, notify if not
 #'
 #' Heavy compute packages (Seurat, scDblFinder, harmony, SingleR, ...) live in
@@ -25,7 +29,10 @@ require_pkgs <- function(pkgs, what = "this step") {
     what, paste(missing, collapse = ", ")
   )
   if (shiny::isRunning()) {
-    shiny::showNotification(msg, type = "error", duration = 10)
+    shiny::showNotification(
+      i18n(msg, sprintf("%s 需要尚未安装的包：%s。请先安装再重试。", what,
+                        paste(missing, collapse = ", "))),
+      type = "error", duration = 10)
   } else {
     warning(msg, call. = FALSE)
   }
@@ -42,17 +49,26 @@ has_pkg <- function(pkg) requireNamespace(pkg, quietly = TRUE)
 #' Pairs with `DT::dataTableOutput(id)` / `shiny::verbatimTextOutput(id)` chosen
 #' at UI-build time by whether DT is installed.
 #'
+#' Large tables are capped at `max_rows` for the browser (AGENTS.md section 3);
+#' offer the full table as a CSV download next to it.
+#'
 #' @param data_fn A function returning a data.frame (may call req()).
+#' @param max_rows Rows sent to the browser.
 #' @keywords internal
-render_tbl_wrap <- function(data_fn) {
+render_tbl_wrap <- function(data_fn, max_rows = 5000) {
   if (has_pkg("DT")) {
     DT::renderDataTable({
-      df <- data_fn(); shiny::req(df)
-      DT::datatable(df, options = list(pageLength = 15, scrollX = TRUE),
+      df <- data_fn()
+      shiny::req(df)
+      DT::datatable(utils::head(df, max_rows), options = list(pageLength = 15, scrollX = TRUE),
                     rownames = TRUE, class = "compact stripe")
     })
   } else {
-    shiny::renderPrint({ df <- data_fn(); shiny::req(df); utils::head(df, 20) })
+    shiny::renderPrint({
+      df <- data_fn()
+      shiny::req(df)
+      utils::head(df, 20)
+    })
   }
 }
 
@@ -67,6 +83,8 @@ render_tbl_wrap <- function(data_fn) {
 #' @return The value of `expr`, or `NULL` on error.
 #' @keywords internal
 with_progress_notify <- function(expr, message = "Working...", session = shiny::getDefaultReactiveDomain()) {
+  # The progress panel is drawn by Shiny's own client code, outside the i18n
+  # swap, so its message stays a plain string; errors below are bilingual.
   prog <- shiny::Progress$new(session)
   prog$set(message = message, value = 0.1)
   on.exit(prog$close(), add = TRUE)
@@ -74,7 +92,8 @@ with_progress_notify <- function(expr, message = "Working...", session = shiny::
     prog$set(value = 0.5)
     force(expr)
   }, error = function(e) {
-    shiny::showNotification(paste("Error:", conditionMessage(e)),
+    shiny::showNotification(i18n(paste("Error:", conditionMessage(e)),
+                                 paste("出错：", conditionMessage(e))),
                             type = "error", duration = 12)
     NULL
   })
@@ -82,24 +101,49 @@ with_progress_notify <- function(expr, message = "Working...", session = shiny::
   out
 }
 
-#' Append a reproducibility log entry (step + parameters + equivalent R code)
+#' Record a reproducibility log entry (step + parameters + equivalent R code)
+#'
+#' Called from inside a module server, the entry is tagged with the module's
+#' step key and omics (read off the session namespace), so the report and the
+#' exported script can keep each pipeline's entries apart. Re-running a step
+#' *replaces* its earlier entry in place rather than appending a second one:
+#' the log describes the analysis as it now stands, which is what a script
+#' replaying it must reproduce. Entries are cleared by [start_epoch()].
 #'
 #' @param log_rv A `reactiveVal` holding a list of log entries.
-#' @param step Character step name.
+#' @param step Character step name (a module may log several distinct names).
 #' @param params Named list of chosen parameters.
 #' @param code Character vector of equivalent R code lines.
+#' @param key Step key; defaults to the calling module's id.
 #' @keywords internal
-log_step <- function(log_rv, step, params = list(), code = character(0)) {
+log_step <- function(log_rv, step, params = list(), code = character(0),
+                     key = NULL) {
+  if (is.null(key)) {
+    dom <- shiny::getDefaultReactiveDomain()
+    ns <- if (!is.null(dom)) tryCatch(dom$ns(""), error = function(e) "") else ""
+    key <- sub("-$", "", ns)
+  }
   entry <- list(
     step = step,
+    key = key,
+    omics = (if (nzchar(key)) step_omics(key) else NULL) %||% "sc",
     time = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
     params = params,
     code = code
   )
-  cur <- log_rv()
-  cur[[length(cur) + 1]] <- entry
+  cur <- shiny::isolate(log_rv())
+  same <- vapply(cur, function(e) identical(e$key, entry$key) &&
+                   identical(e$step, entry$step), logical(1))
+  if (any(same)) cur[[which(same)[1]]] <- entry else cur[[length(cur) + 1]] <- entry
   log_rv(cur)
   invisible(entry)
+}
+
+#' Log entries belonging to one omics pipeline
+#' @param entries List of log entries. @param omics Omics key.
+#' @keywords internal
+log_entries_for <- function(entries, omics = "sc") {
+  Filter(function(e) identical(e$omics %||% "sc", omics), entries %||% list())
 }
 
 #' Guess the sample/batch column in an object's metadata

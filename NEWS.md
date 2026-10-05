@@ -1,4 +1,82 @@
-# OmicOne 0.6.1 (unreleased)
+# OmicOne 0.6.1 (unreleased) — audit 2026-10
+
+## Added
+- **Step animations.** Every step's empty preview plays a short looping scene of
+  what the step does (QC outliers being flagged, a PCA cloud flattening onto its
+  components, cells pulling into a UMAP, a Kaplan-Meier split...). Plain Canvas,
+  no libraries, works offline, follows EN / 中 and light / dark, pauses when off
+  screen, honours reduced motion. Engine `inst/app/www/explain.js`, scenes in
+  `explain-sc.js` / `explain-wes.js`; checked by `node tools/check_explain.js`.
+- **Pipeline state** (`R/fct_state.R`): every registry entry declares the steps it
+  consumes; re-running a step marks finished downstream steps *stale* (amber dot
+  and a banner); importing a dataset starts a new epoch that clears the old
+  results, statuses and log; QC and doublet removal re-run from their own input
+  instead of re-filtering filtered cells.
+- **Every single-cell figure is downloadable** (PNG / JPEG / PDF, DPI) — the same
+  closure that draws it on screen (`render_step_plot()`).
+- **Survival layer**: 95% bands and a number-at-risk table on every KM plot, the
+  HR (95% CI) beside it, Cox HR per SD as the primary result for continuous
+  variables, `cox.zph` check, multivariable Cox with an events-per-variable
+  check, small-sample warnings, and a selection-adjusted p-value for the
+  optimal cut-point (maxstat or the Lausen–Schumacher approximation).
+- **Patient-level composition**: filter the cells (e.g. tumour, baseline), choose
+  the denominator (fraction *of T cells*), drop patients with too few cells —
+  then join, then cut.
+- `AGENTS.md` / `CLAUDE.md`: the design contract every model follows;
+  `tools/sync_mirror.sh` keeps the two repositories identical where they share
+  code.
+- `docs/explain-gallery.html`: all 33 animations on one page.
+
+## Changed
+- The app follows the OS light/dark preference; the language choice is remembered
+  and a first visit follows the browser language.
+- System font stack only (Google Fonts was render-blocking where unreachable).
+- The "next step" link moved into the top bar (the floating chip covered the
+  figure-export row); the always-"not set up" Python indicator is gone.
+- The export menu offers what the active pipeline can export (WES: MAF, mutation
+  table, sample / gene summaries; plus the clinical cohort).
+- Reproducibility log: a re-run replaces its entry; every logged command is
+  runnable base R / Seurat / scop / maftools code with the parameters used (no
+  package internals), and replays to the app's results.
+- scop wrappers rewritten against scop 0.9.2 (`fct_scop.R`); dead wrappers removed.
+
+## Fixed
+- **Doublets** are called per sample (`samples =`), with a seed.
+- **SCT**: PCA now runs on the Pearson residuals (no re-scaling); switching back
+  to LogNormalize no longer normalises the SCT assay.
+- **Integration**: CCA/RPCA results are selectable downstream; "none" and a new
+  PCA drop stale Harmony / integrated reductions; the preview compares the
+  uncorrected and corrected spaces with a batch-mixing entropy.
+- **Clustering**: Leiden backend detected (leidenbase / igraph), k is applied, the
+  active resolution is explicit.
+- **Markers** filtered on adjusted p before ranking; dot plot as described.
+- **Import**: SCE / v4-integrated / multi-layer / multimodal h5 objects are
+  standardised to an `RNA` assay.
+- **QC**: per-sample MAD option, MAD = 0 guarded, haemoglobin pattern no longer
+  matches HBEGF / HBS1L, Ensembl ids detected; violins with thresholds.
+- **Normalisation preview** shows the depth effect before vs after.
+- **Enrichment / GSEA, RNA velocity, trajectories (Slingshot / Monocle / PAGA /
+  Palantir / WOT), CellChat, LIANA, copykat, signature scoring** all called with
+  their current arguments; copykat low-confidence and undefined calls no longer
+  become "normal"; mascarade outlines draw.
+- **Survival**: tied tertiles fail loudly, a single-group split is refused,
+  duplicated patients are refused, the stale event coding no longer zeroes all
+  events, and the shared cohort is never overwritten by an analysis subset.
+- **WES**: samples sequenced but absent from the MAF count as wild-type in survival
+  (TCGA-LAML: 188 patients, was 182); ids normalised; FDR used in comparisons,
+  clinical enrichment and interactions; TMB needs an explicit capture size (BED
+  supported) and the 10 mut/Mb line is labelled as a panel cut-off; signatures
+  detect the `chr` prefix and the genome build; heterogeneity works from read
+  counts; every WES step marks itself done only when it succeeded.
+
+## Validation
+- Tests: 997 passing (R 4.2.3 + Seurat 4.3 + maftools 2.14); the scop, CellChat, LIANA,
+  copykat, SingleR, Azimuth and scDblFinder paths are checked against source but
+  were not executed. See `docs/AUDIT_2026-10.md`.
+
+---
+
+# OmicOne 0.6.1 (unreleased) — earlier work
 
 ## Added
 - **Global progress chip** in the topbar (done/total with a mini bar) and a

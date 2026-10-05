@@ -1,9 +1,10 @@
 #' Module: Cell-cell communication
 #'
-#' Infer ligand-receptor signalling between cell groups (cell types / clusters)
-#' using one of several backends. LIANA and CellChat run in R; CellPhoneDB and
-#' NicheNet need extra (often Python) setup and are marked accordingly.
-#' The result is stored in `rv$cellcomm` (not the Seurat object).
+#' Infer ligand-receptor signalling between cell groups with LIANA (consensus
+#' of several scoring methods, aggregated with liana_aggregate()) or CellChat
+#' (full standard workflow). CellPhoneDB and NicheNet need external setup and
+#' are not run in-app. The result is stored in `rv$cellcomm`, not in the
+#' Seurat object.
 #'
 #' @param id Module id. @param rv shared hub. @param log_rv repro log.
 #' @name mod_cellcomm
@@ -16,44 +17,43 @@ mod_cellcomm_ui <- function(id) {
   explainer <- explainer_card(
     title = list(en = "Cell-cell communication", zh = "细胞间通讯"),
     what = list(
-      en = "Infer which cell groups are talking to which, via ligand-receptor
-            pairs, and how strong each interaction is.",
-      zh = "推断哪些细胞群体在通过配体-受体对相互通讯，以及每种相互作用的强度。"),
+      en = "Infer which cell groups signal to which through ligand-receptor (LR)
+            pairs.",
+      zh = "推断哪些细胞群体通过配体-受体（LR）对向哪些群体发出信号。"),
     why  = list(
-      en = "Tissue function emerges from crosstalk between cell types. Mapping
-            ligand-receptor signalling reveals the wiring behind niches, immune
-            responses and the tumour microenvironment.",
-      zh = "组织功能源于细胞类型之间的相互作用。绘制配体-受体信号可揭示微环境、免疫应答
-            和肿瘤微环境背后的连接关系。"),
+      en = "Tissue function emerges from crosstalk between cell types; LR inference
+            proposes the wiring behind niches, immune responses and the tumour
+            microenvironment. It predicts potential signalling from expression,
+            not measured binding.",
+      zh = "组织功能源于细胞类型之间的相互作用；LR 推断给出微环境、免疫应答和肿瘤微环境背后可能的连接。它是基于表达对潜在信号的预测，而非测得的结合。"),
     how  = list(
-      en = "Pick the metadata column that labels your cell groups (usually cell
-            type or cluster), then a method. <b>LIANA</b> aggregates several
-            scoring methods and is a robust R default; <b>CellChat</b> adds
-            pathway-level views. Methods marked <b>*</b> (CellPhoneDB, NicheNet)
-            need extra setup (often Python).",
-      zh = "选择标注细胞群体的元数据列（通常是细胞类型或簇），再选择方法。
-            <b>LIANA</b> 聚合多种打分方法，是稳健的 R 默认；<b>CellChat</b> 提供通路级视图。
-            标 <b>*</b> 的方法（CellPhoneDB、NicheNet）需要额外设置（通常是 Python）。"),
+      en = "Pick the column that labels the cell groups, then a method.
+            <b>LIANA</b> runs several scoring methods and ranks LR pairs by their
+            consensus (liana_aggregate); pairs with aggregate rank &lt; 0.05 are
+            counted. <b>CellChat</b> runs its full workflow and keeps pairs with
+            permutation p &lt; 0.05. Mouse data use the mouse databases.",
+      zh = "选择标注细胞群体的列，再选择方法。<b>LIANA</b> 运行多种打分方法，并按共识对 LR 对排序（liana_aggregate）；统计 aggregate rank &lt; 0.05 的配对。<b>CellChat</b> 运行其完整流程，保留置换检验 p &lt; 0.05 的配对。小鼠数据使用小鼠数据库。"),
     read = list(
-      en = "Circles are cell types, edges are significant ligand–receptor
-            pairs; a thicker edge means stronger communication. Look for the
-            sender→receiver pairs that could explain a behaviour you see.",
-      zh = "圆圈为细胞类型，连线为显著的配体–受体对；线越粗通讯越强。寻找能解释你所观察现象的发送→接收对。"),
+      en = "The heatmap counts significant LR pairs from each sender (row) to each
+            receiver (column). A count is not a strength: one strong pair can
+            matter more than many weak ones, and groups with more cells reach
+            significance more easily.",
+      zh = "热图统计每个发送方（行）到每个接收方（列）的显著 LR 对数量。数量不等于强度：一个强配对可能比许多弱配对更重要，细胞数更多的群体也更容易达到显著。"),
     example = list(
-      en = "Macrophages signalling to T cells via a checkpoint ligand-receptor
-               pair would appear as a strong edge between those two groups.",
-      zh = "巨噬细胞通过某个免疫检查点配体-受体对向 T 细胞发出信号，会表现为两群之间的一条强边。")
+      en = "Macrophages signalling to T cells through a checkpoint ligand appear as
+            a high count in the macrophage row, T-cell column.",
+      zh = "巨噬细胞通过检查点配体向 T 细胞发出信号，会表现为巨噬细胞行、T 细胞列中较高的计数。")
   )
   controls <- shiny::tagList(
     label_with_help("Group-by column",
-                    "The metadata column labelling the cell groups to test for communication (e.g. cell type, cluster).",
+                    "Metadata column labelling the cell groups tested for communication (e.g. cell type, cluster).",
                     label_zh = "分组列",
-                    tip_zh = "用于检验通讯的细胞群体标注元数据列（如细胞类型、簇）。"),
-    shiny::uiOutput(ns("group_ui")),
+                    tip_zh = "用于检验通讯的细胞群体标注列（如细胞类型、簇）。"),
+    shiny::selectInput(ns("group"), NULL, choices = NULL),
     label_with_help("Method",
-                    "LIANA / CellChat run in R. * = extra setup (often Python) required.",
+                    "LIANA / CellChat run in R. * = extra setup (often Python) required, not run in-app.",
                     label_zh = "方法",
-                    tip_zh = "LIANA / CellChat 在 R 中运行。* = 需要额外设置（通常是 Python）。"),
+                    tip_zh = "LIANA / CellChat 在 R 中运行。* = 需要额外设置（通常是 Python），不在应用内运行。"),
     shiny::selectInput(ns("method"), NULL,
                        choices = c("LIANA" = "liana", "CellChat" = "cellchat",
                                    "CellPhoneDB *" = "cellphonedb",
@@ -64,45 +64,39 @@ mod_cellcomm_ui <- function(id) {
     run_button(ns("run"), "Infer communication", "推断通讯")
   )
   step_container(title = list(en = "Cell-cell communication", zh = "细胞间通讯"),
-                 subtitle = list(en = "Ligand–receptor conversations between cell types.",
-                                 zh = "细胞类型之间的配体–受体对话。"),
+                 subtitle = list(en = "Ligand-receptor signalling between cell types.",
+                                 zh = "细胞类型之间的配体-受体信号。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview"),
-                   guide = list(en = "The inferred communication network will be drawn here.",
-                                zh = "运行后，这里将绘制推断的通讯网络。"),
-                   caption = list(en = "Cell-cell communication network (edge width = strength).",
-                                  zh = "细胞间通讯网络（连线粗细＝强度）。")))
+                 preview = shiny::tagList(
+                   shiny::uiOutput(ns("insight")),
+                   preview_plot_ui(ns("preview"), download = TRUE,
+                     guide = list(en = "A sender x receiver count heatmap will be drawn here.",
+                                  zh = "运行后，这里将绘制发送方 × 接收方的计数热图。"),
+                     caption = list(en = "Number of significant ligand-receptor pairs from each sender group (row) to each receiver group (column).",
+                                    zh = "每个发送方分组（行）到每个接收方分组（列）的显著配体-受体对数量。"))))
 }
 
 #' @rdname mod_cellcomm
 #' @keywords internal
 mod_cellcomm_server <- function(id, rv, log_rv) {
   shiny::moduleServer(id, function(input, output, session) {
-    res <- shiny::reactiveValues(done = FALSE, method = NULL, group = NULL,
-                                 n_interactions = NA)
+    res <- step_results(rv, "sc", done = FALSE, method = NULL, group = NULL,
+                        species = NULL, table = NULL, n_groups = NA)
 
-    # Populate the group-by selector from the object metadata.
-    output$group_ui <- shiny::renderUI({
-      cols <- obj_meta_cols(rv$obj)
-      if (length(cols) == 0) {
-        return(shiny::div(class = "omicone-placeholder",
-                          i18n("Load and annotate a dataset to choose a group column.",
-                               "加载并注释数据集以选择分组列。")))
-      }
-      # Prefer an annotation-like column if present.
-      pref <- cols[cols %in% c("cell_type", "celltype", "CellType", "SingleR",
-                               "seurat_clusters")]
-      default <- if (length(pref)) pref[1] else cols[1]
-      shiny::selectInput(session$ns("group"), NULL, choices = cols, selected = default)
+    shiny::observe({
+      obj <- rv$obj
+      cols <- categorical_cols(obj_meta(obj))
+      def <- default_group_col(cols, obj_misc(obj, "omicone_cluster_col"))
+      shiny::updateSelectInput(session, "group", choices = cols,
+                               selected = keep_selected(shiny::isolate(input$group), cols, def))
     })
 
     shiny::observeEvent(input$run, {
       shiny::req(rv$obj)
-      shiny::req(input$group)
       method <- input$method
-      group  <- input$group
-      # CellPhoneDB / NicheNet are not runnable in-app.
+      group <- input$group
+      shiny::req(method, group)
       if (method %in% c("cellphonedb", "nichenet")) {
         shiny::showNotification(
           i18n(sprintf("'%s' needs extra external setup (often Python) and is not run in-app.", method),
@@ -110,24 +104,39 @@ mod_cellcomm_server <- function(id, rv, log_rv) {
           type = "warning", duration = 10)
         return(NULL)
       }
-      pkg <- if (method == "liana") "liana" else "CellChat"
-      if (!require_pkgs(pkg, "Cell-cell communication")) return(NULL)
-      result <- with_progress_notify({
-        sc_cellcomm(rv$obj, group_by = group, method = method)
+      pkgs <- if (identical(method, "liana")) c("liana", "Seurat") else c("CellChat", "Seurat")
+      if (!require_pkgs(pkgs, "Cell-cell communication")) return(NULL)
+      species <- guess_species(rv$obj)
+      labels <- obj_meta(rv$obj)[[group]]
+      prefixed <- identical(method, "cellchat") && any(as.character(labels) == "0", na.rm = TRUE)
+      do_fast <- has_pkg("presto")
+      out <- with_progress_notify({
+        result <- if (identical(method, "liana")) {
+          sc_liana(rv$obj, group_by = group, species = species)
+        } else {
+          sc_cellchat(rv$obj, group_by = group, species = species, do_fast = do_fast)
+        }
+        list(result = result, table = cellcomm_sig_table(result, method))
       }, message = "Inferring cell-cell communication...")
-      if (is.null(result)) return(NULL)
-      rv$cellcomm <- list(method = method, group = group, result = result)
-      res$done   <- TRUE
-      res$method <- method
-      res$group  <- group
-      res$n_interactions <- tryCatch({
-        if (is.data.frame(result)) nrow(result) else NA_integer_
-      }, error = function(e) NA_integer_)
+      if (is.null(out)) return(NULL)
+      rv$cellcomm <- list(method = method, group = group, result = out$result,
+                          table = out$table)
+      res$done     <- TRUE
+      res$method   <- method
+      res$group    <- group
+      res$species  <- species
+      res$table    <- out$table
+      res$n_groups <- length(unique(stats::na.omit(as.character(labels))))
       mark_done(rv, "cellcomm")
       log_step(log_rv, "Cell-cell communication",
-               params = list(method = method, group_by = group),
-               code = sprintf("cellcomm <- sc_cellcomm(obj, group_by = '%s', method = '%s')",
-                              group, method))
+               params = list(method = method, group_by = group, species = species,
+                             threshold = if (identical(method, "liana"))
+                               "aggregate_rank < 0.05" else "permutation p < 0.05"),
+               code = if (identical(method, "liana")) {
+                 liana_log_code(group, species)
+               } else {
+                 cellchat_log_code(group, species, prefixed = prefixed, do_fast = do_fast)
+               })
       shiny::showNotification(
         i18n(sprintf("Communication inference done (%s).", method),
              sprintf("通讯推断完成（%s）。", method)),
@@ -137,82 +146,43 @@ mod_cellcomm_server <- function(id, rv, log_rv) {
     output$summary <- shiny::renderUI({
       if (!isTRUE(res$done)) {
         return(shiny::div(class = "omicone-placeholder",
-                          i18n("Choose a group column and method, then click Infer communication.",
-                               "选择分组列和方法，然后点击推断通讯。")))
+                          i18n("Choose a group column and method, then click <b>Infer communication</b>.",
+                               "选择分组列和方法，然后点击<b>推断通讯</b>。")))
       }
-      n_lab <- if (is.na(res$n_interactions)) "-" else
-        format(res$n_interactions, big.mark = ",")
-      bslib::layout_columns(
-        col_widths = c(4, 4, 4),
+      shiny::tagList(
         stat_tile(i18n("Method", "方法"), res$method),
         stat_tile(i18n("Group column", "分组列"), res$group),
-        stat_tile(i18n("Interactions", "相互作用数"), n_lab)
+        stat_tile(i18n("Significant LR pairs", "显著 LR 对"),
+                  format(nrow(res$table), big.mark = ","))
       )
     })
 
-    output$preview <- render_scop_plot(function() {
-      shiny::req(res$done)
-      cc <- rv$cellcomm
-      shiny::req(cc)
-      tryCatch(
-        cellcomm_summary_plot(cc$result, cc$method),
-        error = function(e) {
-          shiny::showNotification(
-            i18n(paste("Communication preview unavailable:", conditionMessage(e)),
-                 paste("通讯预览不可用：", conditionMessage(e))),
-            type = "error", duration = 10)
-          NULL
-        })
+    output$insight <- shiny::renderUI({
+      if (!isTRUE(res$done)) return(NULL)
+      tab <- res$table
+      n_pairs <- nrow(unique(tab[, c("ligand", "receptor"), drop = FALSE]))
+      rule_en <- if (identical(res$method, "liana")) {
+        "LIANA aggregate rank &lt; 0.05 (a rank-aggregation score, not FDR-adjusted)"
+      } else {
+        "CellChat permutation p &lt; 0.05 per pair (not FDR-adjusted)"
+      }
+      rule_zh <- if (identical(res$method, "liana")) {
+        "LIANA aggregate rank &lt; 0.05（秩聚合分数，未做 FDR 校正）"
+      } else {
+        "CellChat 每对置换检验 p &lt; 0.05（未做 FDR 校正）"
+      }
+      insight_bar(
+        sprintf("<b>%s</b> significant sender-receiver-LR rows (%s distinct LR pairs) among %d groups, by %s. Cells from all samples are pooled; treat these as hypotheses for validation.",
+                format(nrow(tab), big.mark = ","), format(n_pairs, big.mark = ","),
+                res$n_groups, rule_en),
+        sprintf("%d 个分组之间共 <b>%s</b> 条显著的 发送方-接收方-LR 记录（%s 个不同的 LR 对），判定标准为 %s。所有样本的细胞被合并分析；请将结果视为有待验证的假设。",
+                res$n_groups, format(nrow(tab), big.mark = ","), format(n_pairs, big.mark = ","),
+                rule_zh))
     })
+
+    render_step_plot(output, input, "preview", function() {
+      shiny::req(res$done, res$table)
+      cellcomm_count_plot(res$table)
+    }, name = "cellcomm")
   })
-}
-
-#' Build a robust summary plot from a cell-communication result
-#'
-#' Tries to render a source->target interaction-count heatmap. For LIANA the
-#' result is a data.frame (or a named list of them) with `source`/`target`
-#' columns; for CellChat we fall back to its own netVisual heatmap when
-#' available. Any failure surfaces via the caller's tryCatch.
-#' @keywords internal
-cellcomm_summary_plot <- function(result, method) {
-  method <- tolower(method)
-
-  # LIANA: aggregate to a source x target interaction-count matrix.
-  if (method == "liana") {
-    df <- result
-    # liana_wrap can return a named list of per-method data.frames.
-    if (is.list(df) && !is.data.frame(df)) {
-      hit <- Filter(function(x) is.data.frame(x) &&
-                      all(c("source", "target") %in% colnames(x)), df)
-      if (length(hit)) df <- hit[[1]]
-    }
-    if (!is.data.frame(df) || !all(c("source", "target") %in% colnames(df))) {
-      stop("LIANA result has no source/target columns to summarise.")
-    }
-    counts <- as.data.frame(table(source = df$source, target = df$target),
-                            stringsAsFactors = FALSE)
-    counts$Freq <- as.numeric(counts$Freq)
-    return(
-      ggplot2::ggplot(counts, ggplot2::aes(x = target, y = source, fill = Freq)) +
-        ggplot2::geom_tile(colour = "white") +
-        ggplot2::scale_fill_gradient(low = "#eef3f8", high = "#2f81c7",
-                                     name = "interactions") +
-        ggplot2::labs(x = "Target (receiver) / 靶细胞（接收方）",
-                      y = "Source (sender) / 源细胞（发送方）",
-                      title = "Ligand-receptor interactions / 配体-受体相互作用") +
-        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
-        omicone_theme()
-    )
-  }
-
-  # CellChat: use its own network heatmap if the pipeline has been run.
-  if (method == "cellchat") {
-    if (has_pkg("CellChat")) {
-      p <- tryCatch(CellChat::netVisual_heatmap(result), error = function(e) NULL)
-      if (!is.null(p)) return(p)
-    }
-    stop("CellChat object needs the full inference pipeline before plotting.")
-  }
-
-  stop("No preview available for method '", method, "'.")
 }

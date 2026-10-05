@@ -14,7 +14,9 @@ Every step is designed for beginners *and* experts:
 - 🎚️ **adjustable thresholds** with sensible defaults
 - 📊 a **result summary** and a large **preview plot**
 - 🧾 a **reproducibility log** you can export as an R script or a narrated report
-- 🌗 dark / light themes, English / 中文 — switchable from the top bar
+- 🎞️ a short **animation** in every step's empty canvas showing what the step does
+  (preview them all in `docs/explain-gallery.html`)
+- 🌗 light / dark themes (following your OS), English / 中文 — switchable from the top bar
 
 > **Renamed:** this project was called **OMICstudio** up to v0.5.0. The name
 > clashed with [OmicStudio](https://www.omicstudio.cn), an established cloud
@@ -41,9 +43,10 @@ Choosing a card on the start screen routes you into that pipeline.
 | **Spatial transcriptomics** | Seurat + SpatialExperiment | 🚧 roadmap shown in-app |
 | **Multi-omics integration** | MOFA2 / iClusterPlus / SNFtool | 🚧 roadmap shown in-app |
 
-Clinical follow-up is **shared across pipelines**: load a cohort once in the
-single-cell *Clinical & survival* step and the WES *Mutation vs survival* step
-picks it up automatically — same curves, same log-rank test, same code path.
+Clinical follow-up is **shared across pipelines**: a cohort loaded in the
+single-cell *Clinical & survival* step is offered to the WES *Mutation vs
+survival* step as a source (the full cohort, never an analysis subset) — same
+curves, same log-rank test, same code path.
 
 maftools installs as an ordinary Bioconductor binary, so the WES pipeline needs
 no source build and runs on a machine that blocks compilation.
@@ -127,11 +130,11 @@ Seven phases, twenty-one steps. Bold = the default method.
 | | 3 | Doublets | **scDblFinder** / DoubletFinder |
 | **Preprocess** | 4 | Normalize | **LogNormalize** / SCTransform |
 | | 5 | Features / PCA | HVG **vst** / mvp / dispersion |
-| | 6 | Integrate | **none** / Harmony / CCA / RPCA / scVI / scanorama / BBKNN |
+| | 6 | Integrate | **none** / Harmony / CCA / RPCA (Seurat v5), with a batch-mixing score |
 | **Structure** | 7 | Cluster | **Leiden** / Louvain |
-| | 8 | Embed | **UMAP** / t-SNE / PaCMAP / PHATE |
+| | 8 | Embed | **UMAP** / t-SNE |
 | **Identity** | 9 | Markers | **wilcox** / roc / MAST |
-| | 10 | Annotate | **manual** / SingleR / Azimuth / scop KNN prediction |
+| | 10 | Annotate | **manual** / SingleR (per cluster, pruned labels) / Azimuth |
 | | 11 | Enrichment / GSEA | ORA + GSEA (clusterProfiler via scop) |
 | **Trajectory** | 12 | Trajectory | **Slingshot** / Monocle2 / Monocle3 / PAGA / Palantir |
 | | 13 | RNA velocity | scVelo (steady-state / stochastic / dynamical) |
@@ -179,12 +182,15 @@ pipeline is explorable offline with no data of your own.
 
 ## Caveats
 
-- **Not yet validated end-to-end.** Every file parses, every step's UI builds,
-  every module's outputs evaluate, and the package installs — but neither
-  pipeline has been **run against a live install of its engine with real data**.
-  A few scop and maftools argument names still need checking on first real run;
-  `OmicOne:::wes_missing_api()` reports whether your installed maftools still
-  provides everything the WES modules call.
+- **What has and has not been run (2026-10 audit).** The core single-cell chain
+  (import → QC → doublets → normalize → PCA → integrate → cluster → UMAP →
+  markers) and the clinical/survival maths were run on the bundled data with
+  Seurat 4.3, and their logged R code replays to identical results. The WES
+  pipeline was run on maftools' TCGA-LAML example (maftools 2.14). The scop-backed
+  steps (enrichment, trajectory, velocity, dynamic features), CellChat / LIANA,
+  copykat, SingleR, Azimuth and scDblFinder were checked against their current
+  source code but **not executed**; run them once on your own install before
+  relying on them.
 - **`scop` is the plotting and compute engine** for the single-cell pipeline and
   is a GitHub package; if your machine blocks source builds, use the Docker
   image, which bakes in scop and a pre-built conda environment for the

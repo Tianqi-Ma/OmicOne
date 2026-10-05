@@ -8,13 +8,10 @@
 #' @return A [bslib::page_sidebar()] UI wrapped with the splash overlay.
 #' @keywords internal
 app_ui <- function() {
-  # Inter from Google Fonts, but this app is meant to work offline: if the font
-  # cannot be resolved, fall back to the system UI stack instead of failing.
-  ui_font <- tryCatch(
-    bslib::font_google("Inter", local = FALSE),
-    error = function(e) bslib::font_collection(
-      "Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto",
-      "Helvetica Neue", "Arial", "sans-serif"))
+  # Inter is linked from Google Fonts, but the app must look right offline and
+  # where Google is unreachable: the browser then falls through the system UI
+  # stack (CJK-capable on every OS) instead of a default serif face.
+  ui_font <- app_font_stack()
 
   theme <- bslib::bs_theme(
     version = 5, preset = "shiny",
@@ -39,13 +36,8 @@ app_ui <- function() {
           shiny::actionLink("export_menu", i18n("⤓ Export", "⤓ 导出"),
                             class = "omicone-switch"),
           title = i18n("Export current data", "导出当前数据"),
-          shiny::downloadButton("dl_rds",   i18n("Object (.rds)", "对象 (.rds)"), class = "btn-sm w-100 mb-1"),
-          shiny::downloadButton("dl_meta",  i18n("Cell metadata (.csv)", "细胞元数据 (.csv)"), class = "btn-sm w-100 mb-1"),
-          shiny::downloadButton("dl_matrix",i18n("Counts matrix (.rds)", "表达矩阵 (.rds)"), class = "btn-sm w-100 mb-1"),
-          shiny::downloadButton("dl_embed", i18n("Embeddings (.csv)", "降维坐标 (.csv)"), class = "btn-sm w-100")
+          shiny::uiOutput("export_items")
         ),
-        shiny::div(class = "omicone-pydot", id = "py-status",
-                   i18n("Python: not set up", "Python：未配置")),
         shiny::tags$div(
           class = "omicone-lang",
           shiny::tags$button(class = "omicone-lang-btn active", `data-lang` = "en",
@@ -53,7 +45,9 @@ app_ui <- function() {
           shiny::tags$button(class = "omicone-lang-btn", `data-lang` = "zh",
                              onclick = "OmicOneSetLang('zh')", "中")
         ),
-        bslib::input_dark_mode(id = "dark", mode = "dark")
+        # follow the operating system's light/dark preference; the toggle
+        # still switches it for the session
+        bslib::input_dark_mode(id = "dark")
       )
     ),
     sidebar = bslib::sidebar(
@@ -65,10 +59,13 @@ app_ui <- function() {
     ),
     shiny::tags$head(
       shiny::tags$link(rel = "stylesheet", type = "text/css", href = "omicone/custom.css"),
-      shiny::tags$script(src = "omicone/app.js")
+      shiny::tags$script(src = "omicone/app.js"),
+      shiny::tags$script(src = "omicone/explain.js"),
+      shiny::tags$script(src = "omicone/explain-sc.js"),
+      shiny::tags$script(src = "omicone/explain-wes.js")
     ),
-    shiny::uiOutput("main_body"),
-    shiny::uiOutput("next_hint")
+    shiny::uiOutput("stale_banner"),
+    shiny::uiOutput("main_body")
   )
 
   shiny::tagList(

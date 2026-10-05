@@ -1,7 +1,8 @@
 #' Module 4: Normalization
 #'
 #' Put cells on a comparable scale so that differences reflect biology rather than
-#' sequencing depth. Supports classic LogNormalize (default) or SCTransform.
+#' sequencing depth. Supports classic LogNormalize (default) or SCTransform,
+#' always computed from the RNA counts.
 #'
 #' @param id Module id. @param rv shared hub. @param log_rv repro log.
 #' @name mod_normalize
@@ -26,19 +27,23 @@ mod_normalize_ui <- function(id) {
     how  = list(
       en = "<b>LogNormalize</b> scales each cell to a common total, then log
             transforms (robust default). <b>SCT</b> models counts with a
-            regularized negative binomial and often needs no extra scaling.",
-      zh = "<b>LogNormalize</b> 将每个细胞缩放到统一的总量后再取对数（稳健的默认方法）。
-            <b>SCT</b> 用正则化负二项模型对计数建模，通常无需额外缩放。"),
+            regularized negative binomial; its Pearson residuals replace
+            scaling, and it can regress out the mitochondrial % or cell-cycle
+            scores. Both always start from the RNA counts; switching back to
+            LogNormalize removes the SCT assay.",
+      zh = "<b>LogNormalize</b> 将每个细胞缩放到统一的总量后再取对数（稳健的默认方法）。<b>SCT</b> 用正则化负二项模型对计数建模，其 Pearson 残差替代缩放，并可回归掉线粒体比例或细胞周期评分。两者都从 RNA 计数出发；切回 LogNormalize 会删除 SCT assay。"),
     read = list(
-      en = "The before/after view should show the depth effect disappearing:
-            after normalization, total counts per cell no longer drive the
-            spread.",
-      zh = "前后对比应显示深度效应消失：归一化后，每细胞总计数不再主导数据分布。"),
+      en = "Two panels, before and after: each point is a cell, x = library
+            size (log10 UMIs), y = mean count of the 500 most-expressed genes
+            (raw counts before, normalised counts after; log axis). Before
+            normalisation the cloud climbs with depth (Spearman rho near 1);
+            after, the trend should be much weaker.",
+      zh = "前后两个面板：每个点是一个细胞，横轴 = 文库大小（log10 UMI），纵轴 = 表达最高的 500 个基因的平均计数（归一化前为原始计数，归一化后为归一化计数；对数轴）。归一化前点云随深度上升（Spearman rho 接近 1）；归一化后趋势应明显减弱。"),
     example = list(
       en = "A cell with 20,000 UMIs and one with 5,000 UMIs are put on the same
-               scale so a shared marker reads similarly in both.",
-      zh = "一个有 20,000 个 UMI 的细胞与一个有 5,000 个 UMI 的细胞被放到同一尺度，
-               使共有的标记基因在两者中读数相近。")
+               scale. On the bundled PBMC 3k demo, LogNormalize takes rho from 0.99
+               to 0.10.",
+      zh = "一个有 20,000 个 UMI 的细胞与一个有 5,000 个 UMI 的细胞被放到同一尺度。在内置的 PBMC 3k 演示数据上，LogNormalize 将 rho 从 0.99 降到 0.10。")
   )
   controls <- shiny::tagList(
     label_with_help("Method",
@@ -57,6 +62,14 @@ mod_normalize_ui <- function(id) {
                       "取对数前每个细胞缩放到的统一总量。10,000 是标准默认值。"),
       shiny::numericInput(ns("scale_factor"), NULL, value = 1e4, min = 1, step = 1e3)
     ),
+    shiny::conditionalPanel(
+      sprintf("input['%s'] == 'SCT'", ns("method")),
+      label_with_help("Regress out (optional)",
+                      "Metadata covariates removed from the SCT residuals. Offered only when present: percent.mt (after QC), S.Score / G2M.Score (after cell-cycle scoring).",
+                      "回归掉的变量（可选）",
+                      "从 SCT 残差中去除的元数据协变量。仅在存在时提供：percent.mt（质控后）、S.Score / G2M.Score（细胞周期评分后）。"),
+      shiny::uiOutput(ns("regress_ui"))
+    ),
     run_button(ns("run"), "Normalize", "归一化")
   )
   step_container(title = list(en = "Normalization", zh = "归一化"),
@@ -64,45 +77,67 @@ mod_normalize_ui <- function(id) {
                                  zh = "使测序深度不同的细胞可相互比较。"),
                  explainer = explainer, controls = controls,
                  summary = shiny::uiOutput(ns("summary")),
-                 preview = preview_plot_ui(ns("preview"),
-                   guide = list(en = "Before/after normalization diagnostics will be drawn here.",
-                                zh = "运行后，这里将绘制归一化前后的诊断图。"),
-                   caption = list(en = "Normalization diagnostics: the depth effect before vs after.",
-                                  zh = "归一化诊断：深度效应的前后对比。")))
+                 preview = shiny::tagList(
+                   shiny::uiOutput(ns("insight")),
+                   preview_plot_ui(ns("preview"), download = TRUE,
+                     guide = list(en = "Library size vs the mean count of the top 500 genes, before and after normalization, will be drawn here.",
+                                  zh = "运行后，这里将绘制归一化前后文库大小与前 500 个高表达基因平均计数的关系。"),
+                     caption = list(en = "One point = one cell; rho = Spearman correlation with library size (lower after = less depth effect).",
+                                    zh = "每个点为一个细胞；rho = 与文库大小的 Spearman 相关（归一化后越低说明深度效应越小）。"))))
 }
 
 #' @rdname mod_normalize
 #' @keywords internal
 mod_normalize_server <- function(id, rv, log_rv) {
   shiny::moduleServer(id, function(input, output, session) {
-    res <- shiny::reactiveValues(done = FALSE, method = NULL, scale_factor = NULL,
-                                 md = NULL)
+    res <- step_results(rv, "sc", done = FALSE, method = NULL, scale_factor = NULL,
+                        vars = NULL, diag = NULL)
+
+    output$regress_ui <- shiny::renderUI({
+      cols <- intersect(c("percent.mt", "percent.ribo", "S.Score", "G2M.Score"),
+                        obj_meta_cols(rv$obj))
+      if (!length(cols)) {
+        return(shiny::div(class = "omicone-note",
+                          i18n("No covariates available yet (run QC or cell-cycle scoring first).",
+                               "暂无可用协变量（请先运行质控或细胞周期评分）。")))
+      }
+      shiny::checkboxGroupInput(session$ns("vars"), NULL, choices = cols,
+                                selected = intersect(shiny::isolate(input$vars), cols))
+    })
 
     shiny::observeEvent(input$run, {
       shiny::req(rv$obj)
       if (!require_pkgs("Seurat", "Normalization")) return(NULL)
       method <- input$method
-      sf <- input$scale_factor
-      obj <- with_progress_notify({
-        o <- normalize_obj(rv$obj, method = method, scale_factor = sf)
-        res$md <- obj_meta(o)
-        o
+      sf <- num_input(input$scale_factor, 1)
+      vars <- if (method == "SCT") intersect(input$vars, obj_meta_cols(rv$obj)) else NULL
+      if (method == "LogNormalize" && is.na(sf)) {
+        shiny::showNotification(i18n("Enter a positive scale factor.", "请输入正的缩放因子。"),
+                                type = "error")
+        return(NULL)
+      }
+      had_sct <- "SCT" %in% obj_assays(rv$obj)
+      out <- with_progress_notify({
+        o <- normalize_obj(rv$obj, method = method, scale_factor = sf,
+                           vars_to_regress = vars)
+        list(obj = o, diag = tryCatch(normalize_diag_data(o), error = function(e) NULL))
       }, message = "Normalizing counts...")
-      if (is.null(obj)) return(NULL)
-      rv$obj <- obj
+      if (is.null(out)) return(NULL)
+      rv$obj <- out$obj
       res$done <- TRUE
       res$method <- method
       res$scale_factor <- sf
+      res$vars <- vars
+      res$diag <- out$diag
       mark_done(rv, "normalize")
       log_step(log_rv, "Normalization",
                params = list(method = method,
-                             scale.factor = if (method == "LogNormalize") sf else NA),
-               code = if (method == "LogNormalize") {
-                 sprintf("obj <- Seurat::NormalizeData(obj, normalization.method = 'LogNormalize', scale.factor = %g)", sf)
-               } else {
-                 "obj <- Seurat::SCTransform(obj)"
-               })
-      shiny::showNotification(sprintf("Normalization done (%s).", method),
+                             scale.factor = if (method == "LogNormalize") sf else NULL,
+                             vars.to.regress = vars),
+               code = normalize_log_code(method, sf, vars,
+                                         dropped_sct = method == "LogNormalize" && had_sct))
+      shiny::showNotification(i18n(sprintf("Normalization done (%s).", method),
+                                   sprintf("归一化完成（%s）。", method)),
                               type = "message")
     })
 
@@ -110,31 +145,36 @@ mod_normalize_server <- function(id, rv, log_rv) {
       if (!isTRUE(res$done)) return(shiny::div(class = "omicone-placeholder",
                                                i18n("Pick a method and click Normalize.",
                                                     "选择一种方法并点击归一化。")))
-      bslib::layout_columns(
-        col_widths = c(6, 6),
+      shiny::tagList(
         stat_tile(i18n("Method", "方法"), res$method),
-        stat_tile(i18n("Scale factor", "缩放因子"),
-                  if (identical(res$method, "LogNormalize"))
-                    format(res$scale_factor, big.mark = ",") else "n/a")
+        if (identical(res$method, "LogNormalize")) {
+          stat_tile(i18n("Scale factor", "缩放因子"), format(res$scale_factor, big.mark = ","))
+        } else {
+          stat_tile(i18n("Regressed", "回归变量"),
+                    if (length(res$vars)) paste(res$vars, collapse = ", ") else i18n("none", "无"))
+        },
+        stat_tile(i18n("Active assay", "当前 assay"),
+                  if (identical(res$method, "SCT")) "SCT" else "RNA")
       )
     })
 
-    output$preview <- render_preview_plot(function() {
-      md <- res$md
-      shiny::req(md)
-      shiny::req(!is.null(md$nCount_RNA))
-      # Robust view of sequencing depth: distribution of per-cell library sizes
-      df <- data.frame(cell = rownames(md),
-                       nCount = md$nCount_RNA,
-                       stringsAsFactors = FALSE)
-      df$log_count <- log10(df$nCount + 1)
-      df$text <- sprintf("cell=%s\nUMIs=%s", df$cell,
-                         format(df$nCount, big.mark = ","))
-      ggplot2::ggplot(df, ggplot2::aes(x = log_count)) +
-        ggplot2::geom_histogram(bins = 50, fill = sc_palette(1), alpha = 0.85) +
-        ggplot2::labs(x = "Library size (log10 UMIs)", y = "Cells",
-                      title = "Per-cell sequencing depth / 每个细胞的测序深度") +
-        omicone_theme()
+    output$insight <- shiny::renderUI({
+      dd <- res$diag
+      if (is.null(dd)) return(NULL)
+      rho <- attr(dd, "rho")
+      insight_bar(
+        sprintf("Correlation of the top genes' mean count with library size: Spearman rho %.2f before, %.2f after %s (%s cells shown). Residual correlation can also reflect real differences in cell size or type.",
+                rho[["before"]], rho[["after"]], res$method,
+                format(nrow(dd) / 2, big.mark = ",")),
+        sprintf("头部基因平均计数与文库大小的相关性：%s 前 Spearman rho 为 %.2f，后为 %.2f（展示 %s 个细胞）。剩余相关也可能反映细胞大小或类型的真实差异。",
+                res$method, rho[["before"]], rho[["after"]],
+                format(nrow(dd) / 2, big.mark = ",")))
     })
+
+    render_step_plot(output, input, "preview", function() {
+      dd <- res$diag
+      shiny::req(dd)
+      normalize_diag_plot(dd, res$method)
+    }, name = "normalize")
   })
 }

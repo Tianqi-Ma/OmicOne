@@ -1,8 +1,8 @@
 #' Module: RNA velocity
 #'
-#' Estimate the future transcriptional state of each cell from the ratio of
-#' spliced to unspliced mRNA, giving a directional "velocity" field on the
-#' embedding. Wraps scop::RunSCVELO (scVelo, Python) via sc_velocity().
+#' Estimate each cell's likely next state from the ratio of unspliced to
+#' spliced mRNA, giving a directional field on the UMAP. Wraps
+#' scop::RunSCVELO() (scVelo, Python) via sc_velocity().
 #'
 #' @param id Module id. @param rv shared hub. @param log_rv repro log.
 #' @name mod_velocity
@@ -15,47 +15,46 @@ mod_velocity_ui <- function(id) {
   explainer <- explainer_card(
     title = list(en = "RNA velocity", zh = "RNA 速率"),
     what = list(
-      en = "Predict where each cell is heading by comparing its unspliced
-            (nascent) and spliced (mature) mRNA.",
+      en = "Predict where each cell is heading by comparing its unspliced (nascent)
+            and spliced (mature) mRNA.",
       zh = "通过比较每个细胞的未剪接（新生）与已剪接（成熟）mRNA，预测细胞的走向。"),
     why  = list(
-      en = "Pseudotime gives an order but not a direction. Velocity adds an arrow
-            per cell, showing the likely direction of differentiation on the
-            embedding.",
-      zh = "拟时序给出顺序但不给出方向。速率为每个细胞添加一个箭头，在降维图上展示可能的分化方向。"),
+      en = "Pseudotime gives an order but not a direction. Velocity adds an arrow per
+            cell, an independent check on which way differentiation runs.",
+      zh = "拟时序给出顺序但不给出方向。速率为每个细胞加上一个箭头，可独立检验分化的走向。"),
     how  = list(
-      en = "You need <b>spliced / unspliced layers</b> (from velocyto or
-            kallisto|bustools) in the object, and a <b>Python conda environment</b>
-            (run scop::PrepareEnv() once). The <b>dynamical</b> mode is most
-            accurate; <b>stochastic</b> / <b>deterministic</b> are faster.",
-      zh = "对象中需要包含<b>剪接 / 未剪接图层</b>（来自 velocyto 或 kallisto|bustools），并需要 <b>Python conda 环境</b>（首次使用请运行 scop::PrepareEnv()）。<b>dynamical</b> 模式最准确；<b>stochastic</b> / <b>deterministic</b> 更快。"),
+      en = "The object needs <b>spliced</b> and <b>unspliced</b> assays (velocyto or
+            kallisto|bustools), a PCA and a UMAP, plus a Python environment
+            (scop::PrepareEnv()). <b>Stochastic</b> (default) is fast and stable;
+            <b>dynamical</b> fits full splicing kinetics and is much slower.",
+      zh = "对象需包含 <b>spliced</b> 与 <b>unspliced</b> 两个 assay（来自 velocyto 或 kallisto|bustools）、PCA 与 UMAP，以及 Python 环境（scop::PrepareEnv()）。<b>stochastic</b>（默认）快速稳定；<b>dynamical</b> 拟合完整剪接动力学，速度慢得多。"),
     read = list(
-      en = "Arrows point from a cell's current state toward its likely future
-            state. Long, coherent arrows mean a strong directional flow; short,
-            random ones mean the signal is weak in that region.",
-      zh = "箭头从细胞当前状态指向其可能的未来状态。长而一致的箭头＝强的定向流；短而杂乱的箭头＝该区域信号弱。"),
+      en = "Streamlines on the UMAP follow the projected velocity; cells are
+            coloured by group. Long, coherent streams mean a strong directional
+            flow; tangled or absent streams mean the signal is weak there.",
+      zh = "UMAP 上的流线沿投影后的速率方向；细胞按分组着色。长而一致的流线＝强的定向流；杂乱或缺失的流线＝该区域信号弱。"),
     example = list(
-      en = "In a differentiating system, velocity arrows should flow from
-               progenitor cells outward toward the mature cell types.",
-      zh = "在一个分化系统中，速率箭头应从祖细胞向外流向成熟细胞类型。")
+      en = "In pancreatic endocrinogenesis, streams run from Ngn3+ progenitors toward
+            alpha, beta and delta cells.",
+      zh = "在胰腺内分泌发育中，流线从 Ngn3+ 祖细胞流向 alpha、beta 与 delta 细胞。")
   )
   controls <- shiny::tagList(
     shiny::div(class = "omicone-note",
-               i18n("Requires spliced/unspliced layers and a Python conda env (scop::PrepareEnv()).",
-                    "需要剪接/未剪接图层以及 Python conda 环境（scop::PrepareEnv()）。")),
+               i18n("Requires spliced/unspliced assays, PCA + UMAP, and a Python conda env (scop::PrepareEnv()).",
+                    "需要 spliced/unspliced assay、PCA 与 UMAP，以及 Python conda 环境（scop::PrepareEnv()）。")),
     label_with_help("Mode",
-                    "dynamical = most accurate (recommended); stochastic/deterministic are faster approximations.",
+                    "stochastic = fast, stable default; deterministic = steady-state model; dynamical = full kinetics, slow.",
                     label_zh = "模式",
-                    tip_zh = "dynamical = 最准确（推荐）；stochastic/deterministic 为更快的近似方法。"),
+                    tip_zh = "stochastic = 快速稳定的默认；deterministic = 稳态模型；dynamical = 完整动力学，较慢。"),
     shiny::selectInput(ns("mode"), NULL,
-                       choices = c("Dynamical" = "dynamical",
-                                   "Stochastic" = "stochastic",
-                                   "Deterministic" = "deterministic"),
-                       selected = "dynamical"),
+                       choices = c("Stochastic" = "stochastic",
+                                   "Deterministic" = "deterministic",
+                                   "Dynamical" = "dynamical"),
+                       selected = "stochastic"),
     label_with_help("Group by (metadata column)",
-                    "Cell grouping used to summarise and colour the velocity field (e.g. seurat_clusters, celltype).",
+                    "Cell grouping used to colour the velocity plot (e.g. seurat_clusters, celltype).",
                     label_zh = "分组依据（元数据列）",
-                    tip_zh = "用于汇总并为速率场着色的细胞分组（例如 seurat_clusters、celltype）。"),
+                    tip_zh = "用于为速率图着色的细胞分组（例如 seurat_clusters、celltype）。"),
     shiny::selectInput(ns("group_by"), NULL, choices = NULL),
     run_button(ns("run"), "Run velocity", "运行 RNA 速率")
   )
@@ -66,11 +65,13 @@ mod_velocity_ui <- function(id) {
     explainer = explainer,
     controls  = controls,
     summary   = shiny::uiOutput(ns("summary")),
-    preview   = preview_plot_ui(ns("preview"),
-      guide = list(en = "The velocity field will be drawn here.",
-                   zh = "运行后，这里将绘制速率场。"),
-      caption = list(en = "RNA velocity field over the embedding.",
-                     zh = "叠加在嵌入图上的 RNA 速率场。"))
+    preview   = shiny::tagList(
+      shiny::uiOutput(ns("insight")),
+      preview_plot_ui(ns("preview"), download = TRUE,
+        guide = list(en = "The velocity stream plot will be drawn here.",
+                     zh = "运行后，这里将绘制速率流线图。"),
+        caption = list(en = "RNA-velocity streamlines on the UMAP; cells coloured by group.",
+                       zh = "UMAP 上的 RNA 速率流线；细胞按分组着色。")))
   )
 }
 
@@ -78,65 +79,81 @@ mod_velocity_ui <- function(id) {
 #' @keywords internal
 mod_velocity_server <- function(id, rv, log_rv) {
   shiny::moduleServer(id, function(input, output, session) {
-    res <- shiny::reactiveValues(done = FALSE, mode = NULL, group_by = NULL)
+    res <- step_results(rv, "sc", done = FALSE, mode = NULL, group_by = NULL)
 
-    # Keep the group-by selector in sync with the current object.
     shiny::observe({
       obj <- rv$obj
-      cols <- if (is.null(obj)) character(0) else obj_meta_cols(obj)
-      sel <- if ("celltype" %in% cols) "celltype"
-             else if ("seurat_clusters" %in% cols) "seurat_clusters"
-             else if (length(cols)) cols[1] else NULL
-      shiny::updateSelectInput(session, "group_by", choices = cols, selected = sel)
+      cols <- categorical_cols(obj_meta(obj))
+      def <- default_group_col(cols, obj_misc(obj, "omicone_cluster_col"))
+      shiny::updateSelectInput(session, "group_by", choices = cols,
+                               selected = keep_selected(shiny::isolate(input$group_by),
+                                                        cols, def))
     })
 
     shiny::observeEvent(input$run, {
       shiny::req(rv$obj)
-      # scop::RunSCVELO drives scVelo through a Python conda environment.
+      mode <- input$mode
+      group_by <- input$group_by
+      shiny::req(mode, group_by)
+      miss <- velocity_missing(obj_assays(rv$obj), obj_reductions(rv$obj))
+      if (length(miss)) {
+        shiny::showNotification(
+          i18n(sprintf("RNA velocity needs: %s. Spliced/unspliced counts come from velocyto or kallisto|bustools.",
+                       paste(miss, collapse = ", ")),
+               sprintf("RNA 速率缺少：%s。剪接/未剪接计数来自 velocyto 或 kallisto|bustools。",
+                       paste(miss, collapse = ", "))),
+          type = "warning", duration = 12)
+        return(NULL)
+      }
       if (!require_pkgs("scop", "RNA velocity")) return(NULL)
       shiny::showNotification(
-        i18n("RNA velocity runs in Python and needs spliced/unspliced layers. If it fails, run scop::PrepareEnv().",
-             "RNA 速率在 Python 中运行，且需要剪接/未剪接图层。如果失败，请运行 scop::PrepareEnv()。"),
+        i18n("RNA velocity runs in Python. If it fails, run scop::PrepareEnv().",
+             "RNA 速率在 Python 中运行。如果失败，请运行 scop::PrepareEnv()。"),
         type = "warning", duration = 8)
-      group_by <- input$group_by
-      shiny::req(group_by)
       obj <- with_progress_notify({
-        sc_velocity(rv$obj, group_by = group_by, mode = input$mode)
-      }, message = sprintf("Estimating RNA velocity (%s)...", input$mode))
+        sc_velocity(rv$obj, group_by = group_by, mode = mode)
+      }, message = sprintf("Estimating RNA velocity (%s)...", mode))
       if (is.null(obj)) return(NULL)
       rv$obj <- obj
       res$done     <- TRUE
-      res$mode     <- input$mode
+      res$mode     <- mode
       res$group_by <- group_by
       mark_done(rv, "velocity")
       log_step(log_rv, "RNA velocity",
-               params = list(mode = input$mode, group_by = group_by),
-               code = sprintf(
-                 'obj <- sc_velocity(obj, group_by="%s", mode="%s")',
-                 group_by, input$mode))
+               params = list(mode = mode, group_by = group_by,
+                             linear_reduction = "pca", nonlinear_reduction = "umap"),
+               code = velocity_log_code(group_by, mode))
       shiny::showNotification(
-        i18n(sprintf("RNA velocity (%s) finished on '%s'.", input$mode, group_by),
-             sprintf("RNA 速率（%s）已完成，分组：%s。", input$mode, group_by)),
+        i18n(sprintf("RNA velocity (%s) finished on '%s'.", mode, group_by),
+             sprintf("RNA 速率（%s）已完成，分组：%s。", mode, group_by)),
         type = "message")
     })
 
     output$summary <- shiny::renderUI({
       if (!isTRUE(res$done)) {
         return(shiny::div(class = "omicone-placeholder",
-                          i18n("Ensure spliced/unspliced layers exist, then click <b>Run velocity</b>.",
-                               "确认存在剪接/未剪接图层后，点击<b>运行 RNA 速率</b>。")))
+                          i18n("Check the spliced/unspliced assays exist, then click <b>Run velocity</b>.",
+                               "确认存在 spliced/unspliced assay 后，点击<b>运行 RNA 速率</b>。")))
       }
-      bslib::layout_columns(
-        col_widths = c(6, 6),
+      shiny::tagList(
         stat_tile(i18n("Mode", "模式"), res$mode),
-        stat_tile(i18n("Group by", "分组依据"), res$group_by)
+        stat_tile(i18n("Group by", "分组依据"), res$group_by),
+        stat_tile(i18n("Embedding", "嵌入"), "umap")
       )
     })
 
-    output$preview <- render_scop_plot(function() {
-      shiny::req(res$done)
-      # Velocity stream/grid overlaid on the embedding.
-      sc_velocityplot(rv$obj)
+    output$insight <- shiny::renderUI({
+      if (!isTRUE(res$done)) return(NULL)
+      insight_bar(
+        sprintf("scVelo <b>%s</b> model, neighbours on the PCA, velocity projected onto the UMAP. Projection onto 2-D can bend or invent directions; confirm a flow with marker genes or pseudotime before relying on it.",
+                res$mode),
+        sprintf("scVelo <b>%s</b> 模型，近邻基于 PCA，速率投影到 UMAP。二维投影可能扭曲甚至凭空产生方向；依赖某一流向之前，请用标志基因或拟时序加以确认。",
+                res$mode))
     })
+
+    render_step_plot(output, input, "preview", function() {
+      shiny::req(res$done)
+      sc_velocityplot(rv$obj, mode = res$mode, group_by = res$group_by)
+    }, name = "velocity")
   })
 }

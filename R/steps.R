@@ -22,55 +22,54 @@ steps_for <- function(omics) {
          list())
 }
 
-#' Single-cell steps (scop engine) — fully implemented
+# The single-cell registry, steps_sc(), lives in steps_sc.R: it is shared
+# verbatim with scStudio.
+
+#' Every registry, keyed by omics (used by the pipeline-state helpers)
 #' @keywords internal
-steps_sc <- function() {
-  list(
-    list(v = "import",    n = 1,  phase = "sc_data",   en = "Import",        zh = "导入",       ui = mod_import_ui),
-    list(v = "qc",        n = 2,  phase = "sc_data",   en = "Quality control", zh = "质控",     ui = mod_qc_ui),
-    list(v = "doublet",   n = 3,  phase = "sc_data",   en = "Doublets",      zh = "去双细胞", ui = mod_doublet_ui),
-    list(v = "normalize", n = 4,  phase = "sc_prep",   en = "Normalize",     zh = "归一化", ui = mod_normalize_ui),
-    list(v = "reduce",    n = 5,  phase = "sc_prep",   en = "Features / PCA",zh = "特征/PCA",   ui = mod_reduce_ui),
-    list(v = "integrate", n = 6,  phase = "sc_prep",   en = "Integrate",     zh = "整合",       ui = mod_integrate_ui),
-    list(v = "cluster",   n = 7,  phase = "sc_struct", en = "Cluster",       zh = "聚类",       ui = mod_cluster_ui),
-    list(v = "embed",     n = 8,  phase = "sc_struct", en = "Embed",         zh = "降维图", ui = mod_embed_ui),
-    list(v = "markers",   n = 9,  phase = "sc_id",     en = "Markers",       zh = "标志基因", ui = mod_markers_ui),
-    list(v = "annotate",  n = 10, phase = "sc_id",     en = "Annotate",      zh = "注释",       ui = mod_annotate_ui),
-    list(v = "enrichment",n = 11, phase = "sc_id",     en = "Enrichment/GSEA", zh = "富集/GSEA", ui = mod_enrichment_ui),
-    list(v = "trajectory",n = 12, phase = "sc_traj",   en = "Trajectory",    zh = "轨迹",       ui = mod_trajectory_ui),
-    list(v = "velocity",  n = 13, phase = "sc_traj",   en = "RNA velocity",  zh = "RNA 速率",   ui = mod_velocity_ui),
-    list(v = "dynamic",   n = 14, phase = "sc_traj",   en = "Dynamic features", zh = "动态特征", ui = mod_dynamic_ui),
-    list(v = "cellcycle", n = 15, phase = "sc_adv",    en = "Cell cycle & signatures", zh = "周期与信号", ui = mod_cellcycle_signatures_ui),
-    list(v = "cellcomm",  n = 16, phase = "sc_adv",    en = "Cell communication", zh = "细胞通讯", ui = mod_cellcomm_ui),
-    list(v = "malignancy",n = 17, phase = "sc_adv",    en = "Malignant / CNV", zh = "恶性/CNV", ui = mod_malignancy_ui),
-    list(v = "clinical",  n = 18, phase = "sc_adv",    en = "Clinical & survival", zh = "临床与生存", ui = mod_clinical_ui),
-    list(v = "viz",       n = 19, phase = "sc_out",    en = "Visualize",     zh = "可视化", ui = mod_viz_ui),
-    list(v = "report",    n = 20, phase = "sc_out",    en = "Report",        zh = "报告",       ui = mod_report_ui),
-    list(v = "export",    n = 21, phase = "sc_out",    en = "Export",        zh = "导出",       ui = mod_export_ui)
-  )
+all_step_registries <- function() {
+  list(sc = steps_sc(), wes = steps_wes(), bulk = steps_bulk(),
+       spatial = steps_spatial(), integration = steps_integration())
 }
 
 # Helper to build a placeholder ("coming soon") step.
 .ph <- function(v, n, phase, en, zh) {
-  list(v = v, n = n, phase = phase, en = en, zh = zh, ui = mod_placeholder_ui)
+  list(v = v, n = n, phase = phase, en = en, zh = zh, ui = mod_placeholder_ui,
+       deps = character(0))
 }
 
 #' WES (maftools) steps — fully implemented
+#'
+#' Every step reads the imported MAF and nothing else from the pipeline, so
+#' each depends on `wes_import` only (the clinical table is loaded inside the
+#' steps that need it).
 #' @keywords internal
 steps_wes <- function() {
   list(
-    list(v = "wes_import", n = 1,  phase = "wes_io",   en = "Import MAF",        zh = "导入 MAF",      ui = mod_wes_import_ui),
-    list(v = "wes_summary",n = 2,  phase = "wes_io",   en = "Cohort summary",    zh = "队列概览",      ui = mod_wes_summary_ui),
-    list(v = "wes_onco",   n = 3,  phase = "wes_land", en = "Oncoplot",          zh = "Oncoplot",      ui = mod_wes_onco_ui),
-    list(v = "wes_titv",   n = 4,  phase = "wes_land", en = "TiTv / VAF / rainfall", zh = "TiTv/VAF/rainfall", ui = mod_wes_titv_ui),
-    list(v = "wes_tmb",    n = 5,  phase = "wes_land", en = "TMB",               zh = "突变负荷 TMB",  ui = mod_wes_tmb_ui),
-    list(v = "wes_lolli",  n = 6,  phase = "wes_land", en = "Lollipop / domains",zh = "Lollipop/结构域", ui = mod_wes_lolli_ui),
-    list(v = "wes_driver", n = 7,  phase = "wes_land", en = "Drivers & interactions", zh = "驱动基因与互作", ui = mod_wes_driver_ui),
-    list(v = "wes_sig",    n = 8,  phase = "wes_sig",  en = "Mutational signatures", zh = "突变特征",  ui = mod_wes_sig_ui),
-    list(v = "wes_clin",   n = 9,  phase = "wes_prog", en = "Clinical / pathway / drug", zh = "临床/通路/药物", ui = mod_wes_clin_ui),
-    list(v = "wes_compare",n = 10, phase = "wes_prog", en = "Cohort comparison", zh = "队列比较",      ui = mod_wes_compare_ui),
-    list(v = "wes_surv",   n = 11, phase = "wes_prog", en = "Mutation vs survival", zh = "突变-预后",  ui = mod_wes_surv_ui),
-    list(v = "wes_hetero", n = 12, phase = "wes_prog", en = "Heterogeneity",     zh = "异质性",        ui = mod_wes_hetero_ui)
+    list(v = "wes_import", n = 1,  phase = "wes_io",   en = "Import MAF",        zh = "导入 MAF",      ui = mod_wes_import_ui,
+         deps = character(0)),
+    list(v = "wes_summary",n = 2,  phase = "wes_io",   en = "Cohort summary",    zh = "队列概览",      ui = mod_wes_summary_ui,
+         deps = "wes_import"),
+    list(v = "wes_onco",   n = 3,  phase = "wes_land", en = "Oncoplot",          zh = "Oncoplot",      ui = mod_wes_onco_ui,
+         deps = "wes_import"),
+    list(v = "wes_titv",   n = 4,  phase = "wes_land", en = "TiTv / VAF / rainfall", zh = "TiTv/VAF/rainfall", ui = mod_wes_titv_ui,
+         deps = "wes_import"),
+    list(v = "wes_tmb",    n = 5,  phase = "wes_land", en = "TMB",               zh = "突变负荷 TMB",  ui = mod_wes_tmb_ui,
+         deps = "wes_import"),
+    list(v = "wes_lolli",  n = 6,  phase = "wes_land", en = "Lollipop / domains",zh = "Lollipop/结构域", ui = mod_wes_lolli_ui,
+         deps = "wes_import"),
+    list(v = "wes_driver", n = 7,  phase = "wes_land", en = "Drivers & interactions", zh = "驱动基因与互作", ui = mod_wes_driver_ui,
+         deps = "wes_import"),
+    list(v = "wes_sig",    n = 8,  phase = "wes_sig",  en = "Mutational signatures", zh = "突变特征",  ui = mod_wes_sig_ui,
+         deps = "wes_import"),
+    list(v = "wes_clin",   n = 9,  phase = "wes_prog", en = "Clinical / pathway / drug", zh = "临床/通路/药物", ui = mod_wes_clin_ui,
+         deps = "wes_import"),
+    list(v = "wes_compare",n = 10, phase = "wes_prog", en = "Cohort comparison", zh = "队列比较",      ui = mod_wes_compare_ui,
+         deps = "wes_import"),
+    list(v = "wes_surv",   n = 11, phase = "wes_prog", en = "Mutation vs survival", zh = "突变-预后",  ui = mod_wes_surv_ui,
+         deps = "wes_import"),
+    list(v = "wes_hetero", n = 12, phase = "wes_prog", en = "Heterogeneity",     zh = "异质性",        ui = mod_wes_hetero_ui,
+         deps = "wes_import")
   )
 }
 
@@ -123,15 +122,7 @@ steps_integration <- function() {
 #' Phase labels (en/zh) covering every phase key used above
 #' @keywords internal
 app_phases <- function() {
-  list(
-    # single-cell
-    sc_data = list(en = "Data & QC", zh = "数据与质控"),
-    sc_prep = list(en = "Preprocess", zh = "预处理"),
-    sc_struct = list(en = "Structure", zh = "结构"),
-    sc_id = list(en = "Identity", zh = "身份"),
-    sc_traj = list(en = "Trajectory", zh = "轨迹与动态"),
-    sc_adv = list(en = "Advanced", zh = "高级"),
-    sc_out = list(en = "Output", zh = "产出"),
+  c(phases_sc(), list(
     # WES
     wes_io = list(en = "Input", zh = "输入"),
     wes_land = list(en = "Landscape", zh = "突变全景"),
@@ -151,7 +142,7 @@ app_phases <- function() {
     int_io = list(en = "Input", zh = "输入"),
     int_integ = list(en = "Integration", zh = "整合"),
     int_prog = list(en = "Prognosis & output", zh = "预后与产出")
-  )
+  ))
 }
 
 #' Bilingual label of a step, looked up by its key across every registry

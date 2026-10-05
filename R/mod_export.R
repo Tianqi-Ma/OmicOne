@@ -7,6 +7,100 @@
 #' @name mod_export
 NULL
 
+#' Packages the logged code calls (`pkg::fun`)
+#'
+#' Base packages attached by default are left out; they need no library().
+#' @param entries Log entries (each with a `code` character vector).
+#' @return Sorted unique package names, Seurat / SeuratObject first.
+#' @keywords internal
+log_code_packages <- function(entries) {
+  code <- unlist(lapply(entries %||% list(), function(e) e$code), use.names = FALSE)
+  if (!length(code)) return(character(0))
+  hits <- unlist(regmatches(code, gregexpr("[A-Za-z][A-Za-z0-9.]*(?=:::?)", code, perl = TRUE)))
+  base <- c("base", "stats", "utils", "methods", "graphics", "grDevices", "datasets", "tools")
+  pk <- sort(unique(setdiff(hits, base)))
+  first <- intersect(c("Seurat", "SeuratObject"), pk)
+  c(first, setdiff(pk, first))
+}
+
+#' The R session the analysis ran in, as lines of text
+#'
+#' Versions of the packages the log calls (scop included when it is installed)
+#' and the full sessionInfo().
+#' @param pkgs Package names whose versions are listed.
+#' @return Character vector.
+#' @keywords internal
+session_info_lines <- function(pkgs = character(0)) {
+  pkgs <- unique(c("OmicOne", "Seurat", "SeuratObject", "scop", pkgs))
+  ver <- vapply(pkgs, function(p) {
+    tryCatch(as.character(utils::packageVersion(p)), error = function(e) "not installed")
+  }, character(1))
+  c(sprintf("%s %s", R.version.string, R.version$platform),
+    sprintf("%s: %s", pkgs, ver),
+    "",
+    utils::capture.output(utils::sessionInfo()))
+}
+
+#' The reproducibility script text for a set of log entries
+#'
+#' The header defines `input_path`, loads every package the logged code calls
+#' (each call is also namespaced) and records the app's sessionInfo() as
+#' comments, so a reader can see which versions produced the results.
+#' @param entries Log entries. @param app App name for the title line.
+#' @param session Lines from [session_info_lines()] (comment block).
+#' @return One string.
+#' @keywords internal
+export_script_text <- function(entries, app = "OmicOne",
+                               session = session_info_lines(log_code_packages(entries))) {
+  pkgs <- log_code_packages(entries)
+  header <- c(
+    sprintf("# %s reproducibility script", app),
+    paste0("# Generated: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
+    "#",
+    "# IMPORTANT: set the input path below to your own data before running.",
+    "input_path <- \"PATH/TO/YOUR/DATA\"  # <-- edit this",
+    "",
+    "# Packages the steps below call (every call is also written as pkg::fun).",
+    if (length(pkgs)) sprintf("library(%s)", pkgs) else "# (no package calls recorded)",
+    "",
+    "# Session the analysis ran in (sessionInfo() when this script was exported):",
+    paste0("#   ", session),
+    ""
+  )
+  if (is.null(entries) || !length(entries)) {
+    return(paste(c(header, "# No steps were recorded."), collapse = "\n"))
+  }
+  body <- unlist(lapply(seq_along(entries), function(i) {
+    e <- entries[[i]]
+    params <- if (length(e$params)) {
+      paste(vapply(names(e$params), function(k)
+        sprintf("%s=%s", k, paste(deparse(e$params[[k]]), collapse = "")),
+        character(1)), collapse = ", ")
+    } else ""
+    c(sprintf("# Step %d: %s", i, e$step),
+      if (nzchar(params)) sprintf("#   params: %s", params) else NULL,
+      if (length(e$code)) e$code else "# (no code recorded)",
+      "")
+  }))
+  paste(c(header, body), collapse = "\n")
+}
+
+#' A copy of the object whose assays are all classic (v3) Seurat assays
+#'
+#' SeuratDisk predates Seurat 5's `Assay5`; its support for the layered
+#' assay is not documented, so assays are joined and converted first.
+#' @param obj A Seurat object.
+#' @keywords internal
+export_as_v3 <- function(obj) {
+  for (a in obj_assays(obj)) {
+    if (methods::is(obj[[a]], "Assay5")) {
+      obj[[a]] <- SeuratObject::JoinLayers(obj[[a]])
+      obj[[a]] <- methods::as(obj[[a]], "Assay")
+    }
+  }
+  obj
+}
+
 #' @rdname mod_export
 #' @keywords internal
 mod_export_ui <- function(id) {
@@ -23,14 +117,14 @@ mod_export_ui <- function(id) {
       zh = "可复现是关键：任何人（包括未来的你）都应能凭原始数据和脚本重现这些结果。"),
     how  = list(
       en = "Choose <b>RDS</b> to reload the object in R/Seurat, or <b>.h5ad</b> for
-            Python/Scanpy (best-effort, needs SeuratDisk). The R script lists every
-            step in order -- you only need to set the input path where it says so.",
-      zh = "选择 <b>RDS</b> 以便在 R/Seurat 中重新载入对象，或选择 <b>.h5ad</b> 用于 Python/Scanpy（尽力而为，需要 SeuratDisk）。该 R 脚本会按顺序列出每一步，你只需在提示处设置输入路径。"),
+            Python/Scanpy (needs SeuratDisk; Seurat 5 assays are converted to the
+            classic format first). The R script loads the packages it uses, lists
+            every step in order and records the session's package versions.",
+      zh = "选择 <b>RDS</b> 以便在 R/Seurat 中重新载入对象，或选择 <b>.h5ad</b> 用于 Python/Scanpy（需要 SeuratDisk；Seurat 5 的 assay 会先转换为经典格式）。R 脚本会加载所用的包、按顺序列出每一步，并记录当前会话的包版本。"),
     read = list(
-      en = "Every export replays the current object state. The log lists each
-            step with its parameters — enough for anyone to reproduce the
-            analysis from scratch.",
-      zh = "每次导出都保存当前对象的状态。日志列出每一步及其参数——足以让任何人从头复现该分析。"),
+      en = "The step list shows what the script will replay: each step with its
+            parameters and code, from the log of the steps you ran.",
+      zh = "步骤列表即脚本将重放的内容：依据你运行过的步骤的日志，列出每一步及其参数和代码。"),
     example = list(
       en = "Re-run with <code>source(\"omicone_analysis.R\")</code> after
                editing the <code>input_path</code> line at the top.",
@@ -72,37 +166,8 @@ mod_export_ui <- function(id) {
 mod_export_server <- function(id, rv, log_rv) {
   shiny::moduleServer(id, function(input, output, session) {
 
-    # Build the reproducibility R script text from the log entries.
-    build_script <- function(entries) {
-      header <- c(
-        "# OmicOne reproducibility script",
-        paste0("# Generated: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
-        "#",
-        "# IMPORTANT: set the input path below to your own data before running.",
-        'input_path <- "PATH/TO/YOUR/DATA"  # <-- edit this',
-        "library(Seurat)",
-        ""
-      )
-      if (is.null(entries) || !length(entries)) {
-        return(paste(c(header, "# No steps were recorded."), collapse = "\n"))
-      }
-      body <- unlist(lapply(seq_along(entries), function(i) {
-        e <- entries[[i]]
-        params <- if (length(e$params)) {
-          paste(vapply(names(e$params), function(k)
-            sprintf("%s=%s", k, paste(deparse(e$params[[k]]), collapse = "")),
-            character(1)), collapse = ", ")
-        } else ""
-        c(sprintf("# Step %d: %s", i, e$step),
-          if (nzchar(params)) sprintf("#   params: %s", params) else NULL,
-          if (length(e$code)) e$code else "# (no code recorded)",
-          "")
-      }))
-      paste(c(header, body), collapse = "\n")
-    }
-
     output$summary <- shiny::renderUI({
-      entries <- log_rv()
+      entries <- log_entries_for(log_rv(), "sc")
       if (is.null(entries) || !length(entries)) {
         return(shiny::div(class = "omicone-placeholder",
                           i18n("No steps recorded yet. Run some analysis steps first.",
@@ -120,12 +185,12 @@ mod_export_server <- function(id, rv, log_rv) {
     })
 
     output$preview <- shiny::renderUI({
-      shiny::div(class = "omicone-note",
-                 i18n(paste0("No plot for this step. Use the buttons on the left to download ",
+      explain_scene("export",
+                 paste0("No plot for this step. Use the buttons on the left to download ",
                              "your processed object and the reproducibility script. ",
                              "Remember to set input/output paths when you re-run the script."),
-                      paste0("这一步没有图表。请使用左侧的按钮下载你处理后的对象和可复现脚本。",
-                             "重新运行脚本时，记得设置输入/输出路径。")))
+                 paste0("这一步没有图表。请使用左侧的按钮下载你处理后的对象和可复现脚本。",
+                        "重新运行脚本时，记得设置输入/输出路径。"))
     })
 
     output$download_obj <- shiny::downloadHandler(
@@ -148,10 +213,25 @@ mod_export_server <- function(id, rv, log_rv) {
             writeLines("SeuratDisk not installed; could not write .h5ad.", file)
             return(invisible(NULL))
           }
-          tmp <- tempfile(fileext = ".h5Seurat")
-          SeuratDisk::SaveH5Seurat(obj, filename = tmp, overwrite = TRUE)
-          SeuratDisk::Convert(tmp, dest = "h5ad", overwrite = TRUE)
-          file.copy(sub("\\.h5Seurat$", ".h5ad", tmp), file, overwrite = TRUE)
+          msg <- tryCatch({
+            tmp <- tempfile(fileext = ".h5Seurat")
+            SeuratDisk::SaveH5Seurat(export_as_v3(obj), filename = tmp, overwrite = TRUE)
+            SeuratDisk::Convert(tmp, dest = "h5ad", overwrite = TRUE)
+            file.copy(sub("\\.h5Seurat$", ".h5ad", tmp), file, overwrite = TRUE)
+            NULL
+          }, error = function(e) conditionMessage(e))
+          if (!is.null(msg)) {
+            writeLines(c("The .h5ad export failed:", msg,
+                         "Download the RDS instead and convert it in R, e.g. with",
+                         "zellkonverter::writeH5AD() on Seurat::as.SingleCellExperiment(obj)."),
+                       file)
+            shiny::showNotification(
+              i18n(paste("The .h5ad export failed:", msg,
+                         "The downloaded file explains the error; use RDS instead."),
+                   paste("导出 .h5ad 失败：", msg, "下载的文件中给出了错误说明；请改用 RDS。")),
+              type = "error", duration = 15)
+            return(invisible(NULL))
+          }
         } else {
           writeLines(c(
             "Figures are downloaded individually from the Visualize step",
@@ -165,7 +245,7 @@ mod_export_server <- function(id, rv, log_rv) {
       filename = function()
         paste0("omicone_analysis_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".R"),
       content = function(file) {
-        writeLines(build_script(log_rv()), file)
+        writeLines(export_script_text(log_entries_for(log_rv(), "sc")), file)
         mark_done(rv, "export")
       }
     )

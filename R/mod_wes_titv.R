@@ -21,35 +21,45 @@ mod_wes_titv_ui <- function(id) {
             against the distance to the previous one.",
       zh = "<b>TiTv</b>：转换（A↔G、C↔T）与颠换的比例。<b>VAF</b>：每个基因的变异等位基因频率分布。<b>Rainfall</b>：把每个变异按其在基因组上的位置、以及与前一个变异的距离画出来。"),
     why  = list(
-      en = "The TiTv spectrum is a fingerprint of the underlying mutational
-            process. VAF separates clonal (~50% in a pure diploid tumour) from
-            subclonal variants. Rainfall reveals <i>kataegis</i> — localised
-            hypermutation showing up as a tight cluster low on the plot.",
-      zh = "TiTv 谱是潜在突变过程的指纹。VAF 能区分克隆性变异（纯二倍体肿瘤中约 50%）与亚克隆变异。Rainfall 可揭示 <i>kataegis</i>——局部超突变，表现为图上贴近底部的密集簇。"),
+      en = "The base-change spectrum reflects the mutational processes and the
+            sample handling behind the calls. VAF separates clonal (~50% in a
+            pure diploid tumour) from subclonal variants. Rainfall was designed
+            to show <i>kataegis</i> — localised hypermutation, a tight cluster
+            low on the plot — which is defined on whole genomes: an exome
+            samples only ~1–2% of the genome, so a WES rainfall rarely has the
+            density to show it.",
+      zh = "碱基替换谱反映了变异背后的突变过程与样本处理过程。VAF 能区分克隆性变异（纯二倍体肿瘤中约 50%）与亚克隆变异。Rainfall 原本用于展示 <i>kataegis</i>——局部超突变，表现为图上贴近底部的密集簇——它是在全基因组上定义的：外显子组只覆盖约 1–2% 的基因组，WES 的 rainfall 很少有足够的密度显示它。"),
     how  = list(
       en = "Turn <b>include synonymous</b> off to look only at coding impact.
-            VAF and rainfall need a <b>VAF column</b>; many MAFs do not have one,
-            in which case those two tabs will say so.",
-      zh = "关闭<b>包含同义突变</b>可只看编码影响。VAF 和 rainfall 需要一个 <b>VAF 列</b>；很多 MAF 没有该列，这两个页签会给出提示。"),
+            VAF and heterogeneity need allele fractions: a <b>VAF column</b>, or
+            <code>t_ref_count</code>/<code>t_alt_count</code>, from which
+            maftools computes it. Population frequencies (ExAC, gnomAD) are not
+            VAFs and are never offered. Set the <b>reference build</b> to the
+            MAF's coordinates so the rainfall chromosomes have the right lengths.",
+      zh = "关闭<b>包含同义突变</b>可只看编码影响。VAF 与异质性分析需要等位基因频率：一个 <b>VAF 列</b>，或 <code>t_ref_count</code>/<code>t_alt_count</code>（maftools 会据此计算）。人群频率（ExAC、gnomAD）不是 VAF，不会出现在候选中。请把<b>参考基因组</b>设为 MAF 坐标所用的版本，rainfall 的染色体长度才会正确。"),
     read = list(
       en = "<b>TiTv</b>: the boxplots spread each sample's six base changes; the
-            bars summarise the cohort. Transitions normally outnumber
-            transversions ~2:1 — a flipped ratio means a mutagen or a QC
-            problem. <b>VAF</b>: one cloud per gene; clonal heterozygous
-            mutations sit near 0.5, subclones trail lower. <b>Rainfall</b>: most
-            variants lie far apart (high on the y-axis); a tight cluster hugging
-            the bottom is a kataegis hotspot.",
-      zh = "<b>TiTv</b>：箱线图展开每个样本的六类碱基替换，柱条汇总整个队列。正常情况下转换约为颠换的 2 倍——比例倒挂提示诱变剂暴露或质控问题。<b>VAF</b>：每个基因一朵云；克隆性杂合突变位于 0.5 附近，亚克隆拖在低处。<b>Rainfall</b>：多数变异彼此相距很远（纵轴高处）；贴底的密集簇即 kataegis 热点。"),
+            bars summarise the cohort. Exome and genome data have different
+            expected ratios, and FFPE deamination inflates C>T while oxidative
+            damage (8-oxoG) inflates C>A, so judge the spectrum against a
+            comparable cohort rather than a fixed ratio. <b>VAF</b>: one cloud
+            per gene; clonal heterozygous mutations sit near half the purity,
+            subclones trail lower. <b>Rainfall</b>: most variants lie far apart
+            (high on the y-axis).",
+      zh = "<b>TiTv</b>：箱线图展开每个样本的六类碱基替换，柱条汇总整个队列。外显子组与全基因组的预期比例不同，FFPE 脱氨基会抬高 C>T，氧化损伤（8-oxoG）会抬高 C>A，因此请与可比队列对照，而不是套用固定比例。<b>VAF</b>：每个基因一朵云；克隆性杂合突变位于纯度一半附近，亚克隆拖在低处。<b>Rainfall</b>：多数变异彼此相距很远（纵轴高处）。"),
     example = list(
-      en = "A C>T dominated spectrum in a skin tumour points at UV damage; in a
-               lung tumour a C>A excess points at tobacco.",
-      zh = "皮肤肿瘤中以 C>T 为主的谱指向紫外损伤；肺肿瘤中 C>A 偏多则指向烟草。")
+      en = "A C>T-dominated spectrum in a skin tumour fits UV damage; a C>A excess
+               in a lung tumour fits tobacco, but the same excess in an FFPE or
+               long-stored library can be 8-oxoG artefact — the signature step
+               (SBS4 vs SBS45) tells them apart better.",
+      zh = "皮肤肿瘤中以 C>T 为主的谱符合紫外损伤；肺肿瘤中 C>A 偏多符合烟草，但 FFPE 或长期保存文库中同样的偏多可能是 8-oxoG 伪影——突变特征步骤（SBS4 与 SBS45）更能区分两者。")
   )
   controls <- shiny::tagList(
     shiny::checkboxInput(ns("use_syn"),
                          i18n("Include synonymous variants", "包含同义突变"), value = TRUE),
     shiny::uiOutput(ns("vaf_ui")),
     shiny::uiOutput(ns("sample_ui")),
+    shiny::uiOutput(ns("build_ui")),
     shiny::checkboxInput(ns("changepoints"),
                          i18n("Detect kataegis change points", "检测 kataegis 变化点"),
                          value = TRUE),
@@ -65,14 +75,23 @@ mod_wes_titv_ui <- function(id) {
     preview   = shiny::tagList(
       shiny::uiOutput(ns("insight")),
       bslib::navset_card_tab(
-      bslib::nav_panel("TiTv",     preview_plot_ui(ns("titv"), download = TRUE,
-                                       guide = list(en = "Transition/transversion spectra for every sample will be drawn here.",
-                                                    zh = "运行后，这里将绘制每个样本的转换/颠换图谱。"),
-                                       caption = list(en = "Boxplots: per-sample share of the six base changes; bars: cohort totals.",
-                                                      zh = "箱线图：每样本六类碱基替换的占比；柱条：队列汇总。"))),
-      bslib::nav_panel("VAF",      preview_plot_ui(ns("vaf"), download = TRUE)),
-      bslib::nav_panel(i18n("Rainfall", "Rainfall"), preview_plot_ui(ns("rain"), download = TRUE))
-    ))
+        bslib::nav_panel("TiTv", preview_plot_ui(ns("titv"), download = TRUE,
+                                                 guide = list(en = "Transition/transversion spectra for every sample will be drawn here.",
+                                                              zh = "运行后，这里将绘制每个样本的转换/颠换图谱。"),
+                                                 caption = list(en = "Boxplots: per-sample share of the six base changes; bars: cohort totals.",
+                                                                zh = "箱线图：每样本六类碱基替换的占比；柱条：队列汇总。"))),
+        bslib::nav_panel("VAF", preview_plot_ui(ns("vaf"), download = TRUE,
+                                                guide = list(en = "Allele-fraction distributions of the most mutated genes will be drawn here.",
+                                                             zh = "运行后，这里将绘制高频突变基因的等位基因频率分布。"),
+                                                caption = list(en = "One box per gene: VAF of its mutations across samples.",
+                                                               zh = "每个基因一个箱：其突变在各样本中的 VAF。"))),
+        bslib::nav_panel(i18n("Rainfall", "Rainfall"),
+                         preview_plot_ui(ns("rain"), download = TRUE,
+                                         guide = list(en = "The chosen sample's variants along the genome will be drawn here.",
+                                                      zh = "运行后，这里将绘制所选样本的变异在基因组上的分布。"),
+                                         caption = list(en = "x = genomic position, y = log10 distance to the previous variant; colour = base change. Kataegis is defined on whole genomes.",
+                                                        zh = "横轴＝基因组位置，纵轴＝与前一个变异距离的 log10；颜色＝碱基替换。kataegis 是在全基因组上定义的。")))
+      ))
   )
 }
 
@@ -81,53 +100,72 @@ mod_wes_titv_ui <- function(id) {
 mod_wes_titv_server <- function(id, rv, log_rv) {
   shiny::moduleServer(id, function(input, output, session) {
     ns  <- session$ns
-    res <- shiny::reactiveValues(titv = NULL, cfg = NULL)
+    res <- step_results(rv, "wes", titv = NULL, cfg = NULL)
 
     output$vaf_ui <- shiny::renderUI({
       shiny::req(rv$maf)
       f <- wes_fields(rv$maf)
-      guess <- wes_guess_vaf_col(rv$maf)
-      shiny::tagList(
-        label_with_help("VAF column",
-                        "Which MAF column holds the variant allele frequency. Needed by the VAF and rainfall tabs.",
-                        label_zh = "VAF 列",
-                        tip_zh = "MAF 中存放变异等位基因频率的列，VAF 与 rainfall 页签需要它。"),
-        shiny::selectInput(ns("vaf_col"), NULL,
-                           choices = c(stats::setNames("", "(none)"), f),
-                           selected = guess %||% "")
-      )
+      vc <- wes_vaf_choice(f)
+      wes_col_select(ns, "vaf_col",
+                     label = list(en = "VAF column", zh = "VAF 列"),
+                     tip = list(en = "Tumour variant allele fraction. Auto = maftools uses t_vaf, or computes t_alt_count / (t_ref_count + t_alt_count).",
+                                zh = "肿瘤变异等位基因频率。自动＝maftools 使用 t_vaf，或按 t_alt_count / (t_ref_count + t_alt_count) 计算。"),
+                     choices = f, selected = vc$selected, none = vc$none)
     })
 
     output$sample_ui <- shiny::renderUI({
       shiny::req(rv$maf)
       s <- wes_samples(rv$maf)
-      shiny::tagList(
-        label_with_help("Sample for the rainfall plot",
-                        "Rainfall is per-sample: pick the one you want to inspect.",
-                        label_zh = "Rainfall 的样本",
-                        tip_zh = "Rainfall 是逐样本的：选择要查看的样本。"),
-        shiny::selectInput(ns("tsb"), NULL, choices = s,
-                           selected = if (length(s)) s[1] else NULL)
-      )
+      wes_col_select(ns, "tsb",
+                     label = list(en = "Sample for the rainfall plot", zh = "Rainfall 的样本"),
+                     tip = list(en = "Rainfall is per-sample: pick the one you want to inspect.",
+                                zh = "Rainfall 是逐样本的：选择要查看的样本。"),
+                     choices = s, selected = if (length(s)) s[1] else NULL, selectize = TRUE)
+    })
+
+    output$build_ui <- shiny::renderUI({
+      shiny::req(rv$maf)
+      guess <- wes_guess_build(rv$maf)
+      wes_col_select(ns, "build",
+                     label = list(en = "Reference build", zh = "参考基因组"),
+                     tip = list(en = "Chromosome lengths for the rainfall x-axis. Pre-selected from the MAF's NCBI_Build column.",
+                                zh = "Rainfall 横轴的染色体长度。已按 MAF 的 NCBI_Build 列预选。"),
+                     choices = c("hg19" = "hg19", "hg38" = "hg38"),
+                     selected = if (is.na(guess)) "hg19" else guess)
     })
 
     shiny::observeEvent(input$run, {
       shiny::req(rv$maf)
       if (!require_pkgs("maftools", "Mutation spectra")) return(NULL)
-      tv <- with_progress_notify(wes_titv(rv$maf, use_syn = isTRUE(input$use_syn)),
+      use_syn <- isTRUE(input$use_syn)
+      vaf <- if (nzchar(input$vaf_col %||% "")) input$vaf_col else NULL
+      fields <- wes_fields(rv$maf)
+      cfg <- list(vaf = vaf, vaf_ok = !is.null(vaf) || wes_vaf_auto(fields),
+                  tsb = input$tsb, cp = isTRUE(input$changepoints),
+                  build = input$build %||% "hg19", use_syn = use_syn)
+      tv <- with_progress_notify(wes_titv(rv$maf, use_syn = use_syn),
                                  message = "Computing TiTv...")
       if (is.null(tv)) return(NULL)
       res$titv <- tv
-      res$cfg  <- list(vaf = if (nzchar(input$vaf_col %||% "")) input$vaf_col else NULL,
-                       tsb = input$tsb,
-                       cp  = isTRUE(input$changepoints))
+      res$cfg  <- cfg
       mark_done(rv, "wes_titv")
+      code <- c(wes_code("maftools::titv", list(maf = quote(maf), useSyn = use_syn,
+                                                 plot = FALSE), assign = "titv_res"),
+                wes_code("maftools::plotTiTv", list(res = quote(titv_res))),
+                if (cfg$vaf_ok) wes_code("maftools::plotVaf", list(maf = quote(maf), vafCol = vaf)),
+                if (!is.null(cfg$tsb))
+                  wes_code("maftools::rainfallPlot",
+                           list(maf = quote(maf), tsb = cfg$tsb, detectChangePoints = cfg$cp,
+                                ref.build = cfg$build, pointSize = 0.6)))
       log_step(log_rv, "WES mutation spectra",
-               params = list(useSyn = input$use_syn, vafCol = input$vaf_col,
-                             rainfall_sample = input$tsb),
-               code = c(sprintf('titv <- maftools::titv(maf, useSyn = %s, plot = FALSE)',
-                                input$use_syn),
-                        'maftools::plotTiTv(titv)'))
+               params = list(useSyn = use_syn, vafCol = vaf %||% "(auto)",
+                             rainfall_sample = cfg$tsb, ref.build = cfg$build),
+               code = code)
+    })
+
+    stats <- shiny::reactive({
+      shiny::req(res$titv)
+      wes_titv_pooled(res$titv)
     })
 
     output$summary <- shiny::renderUI({
@@ -136,41 +174,36 @@ mod_wes_titv_server <- function(id, rv, log_rv) {
         return(wes_prompt("Click <b>Draw spectra</b> to compute the TiTv summary.",
                           "点击<b>绘制图谱</b>计算 TiTv 概览。"))
       }
-      frac <- tryCatch(as.data.frame(res$titv$fraction.contribution),
-                       error = function(e) NULL)
-      pick <- function(nm) {
-        if (is.null(frac) || !nm %in% colnames(frac)) return("-")
-        sprintf("%.1f%%", mean(frac[[nm]], na.rm = TRUE))
-      }
-      bslib::layout_columns(
-        col_widths = c(3, 3, 3, 3),
-        stat_tile("C>T", pick("C>T")),
-        stat_tile("C>A", pick("C>A")),
-        stat_tile("T>C", pick("T>C")),
+      p <- stats()
+      pick <- function(nm) if (nm %in% names(p)) sprintf("%.1f%%", p[[nm]]) else "-"
+      shiny::tagList(
+        stat_tile(i18n("C>T (pooled)", "C>T（合并）"), pick("C>T")),
+        stat_tile(i18n("C>A (pooled)", "C>A（合并）"), pick("C>A")),
+        stat_tile(i18n("Transitions (pooled)", "转换（合并）"), pick("Ti")),
         stat_tile(i18n("VAF column", "VAF 列"),
-                  res$cfg$vaf %||% i18n("none", "无"))
+                  res$cfg$vaf %||% (if (isTRUE(res$cfg$vaf_ok)) i18n("auto", "自动")
+                                    else i18n("none", "无")))
       )
     })
 
     output$insight <- shiny::renderUI({
-      tv <- res$titv
-      if (is.null(tv)) return(NULL)
-      frac <- tryCatch(as.data.frame(tv$fraction.contribution),
-                       error = function(e) NULL)
-      if (is.null(frac) || !all(c("C>T", "C>A") %in% colnames(frac))) return(NULL)
-      ct <- mean(frac[["C>T"]], na.rm = TRUE)
-      ca <- mean(frac[["C>A"]], na.rm = TRUE)
-      verdict_en <- if (isTRUE(ca >= 25)) "a C>A share this high points at tobacco exposure"
-                    else if (isTRUE(ct >= 40)) "a C>T-led spectrum is the normal ageing background"
-                    else "no single base change dominates"
-      verdict_zh <- if (isTRUE(ca >= 25)) "C>A 占比如此之高，提示烟草暴露"
-                    else if (isTRUE(ct >= 40)) "以 C>T 为主是正常的衰老背景"
-                    else "没有单一碱基替换占主导"
+      if (is.null(res$titv)) return(NULL)
+      p <- stats()
+      if (!all(c("C>T", "C>A") %in% names(p))) return(NULL)
+      ct <- p[["C>T"]]
+      ca <- p[["C>A"]]
+      n_snv <- attr(p, "n_snv")
+      lead_en <- if (isTRUE(ct >= 40)) "C>T leads, as in most clock-like / ageing spectra (FFPE deamination also raises C>T)"
+                 else if (isTRUE(ca >= 25)) "C>A is high; tobacco, 8-oxoG oxidative damage and FFPE / library artefacts all raise it, so check the signature step before naming a cause"
+                 else "no single base change dominates"
+      lead_zh <- if (isTRUE(ct >= 40)) "C>T 居首，与多数时钟样/衰老谱一致（FFPE 脱氨基同样会抬高 C>T）"
+                 else if (isTRUE(ca >= 25)) "C>A 偏高；烟草、8-oxoG 氧化损伤以及 FFPE/建库伪影都会抬高它，命名原因前请先看突变特征步骤"
+                 else "没有单一碱基替换占主导"
       insight_bar(
-        sprintf("C>T accounts for <b>%.1f%%</b> of substitutions, C>A for <b>%.1f%%</b> — %s.",
-                ct, ca, verdict_en),
-        sprintf("C>T 占碱基替换的 <b>%.1f%%</b>，C>A 占 <b>%.1f%%</b>——%s。",
-                ct, ca, verdict_zh))
+        sprintf("Of %s SNVs pooled across the cohort, C>T is <b>%.1f%%</b> and C>A <b>%.1f%%</b> — %s.",
+                wes_fmt(n_snv), ct, ca, lead_en),
+        sprintf("全队列合并的 %s 个 SNV 中，C>T 占 <b>%.1f%%</b>，C>A 占 <b>%.1f%%</b>——%s。",
+                wes_fmt(n_snv), ct, ca, lead_zh))
     })
 
     draw_titv <- with_text_boost(function() {
@@ -183,8 +216,8 @@ mod_wes_titv_server <- function(id, rv, log_rv) {
 
     draw_vaf <- with_text_boost(function() {
       shiny::req(rv$maf, res$cfg)
-      if (is.null(res$cfg$vaf)) {
-        stop("No VAF column selected. Pick one in the control panel, or this MAF does not carry allele frequencies.")
+      if (!isTRUE(res$cfg$vaf_ok)) {
+        stop("No allele fractions: pick a VAF column, or provide t_ref_count / t_alt_count in the MAF.")
       }
       maftools::plotVaf(maf = rv$maf, vafCol = res$cfg$vaf)
     })
@@ -195,7 +228,8 @@ mod_wes_titv_server <- function(id, rv, log_rv) {
     draw_rain <- with_text_boost(function() {
       shiny::req(rv$maf, res$cfg, res$cfg$tsb)
       maftools::rainfallPlot(maf = rv$maf, tsb = res$cfg$tsb,
-                             detectChangePoints = res$cfg$cp, pointSize = 0.6)
+                             detectChangePoints = res$cfg$cp,
+                             ref.build = res$cfg$build, pointSize = 0.6)
     })
     output$rain <- render_base_plot(draw_rain)
     register_figure_download(output, input, "rain", draw_rain, "wes_rainfall",

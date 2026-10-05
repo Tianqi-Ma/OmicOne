@@ -3,3 +3,6 @@
 ^\.github$
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^AGENTS\.md$
+^CLAUDE\.md$
+^docs$

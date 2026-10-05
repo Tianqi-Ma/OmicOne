@@ -29,9 +29,7 @@ data_overview <- function(obj) {
 #' @return A data.frame (genes x cells) small enough to render in a table.
 #' @keywords internal
 counts_preview <- function(obj, n_genes = 50, n_cells = 100) {
-  m <- tryCatch(SeuratObject::LayerData(obj, layer = "counts"),
-                error = function(e) tryCatch(SeuratObject::GetAssayData(obj, slot = "counts"),
-                                             error = function(e2) NULL))
+  m <- obj_layer(obj, "counts", "RNA")
   if (is.null(m)) stop("Could not access the counts matrix.")
   g <- seq_len(min(n_genes, nrow(m)))
   c <- seq_len(min(n_cells, ncol(m)))
@@ -40,14 +38,20 @@ counts_preview <- function(obj, n_genes = 50, n_cells = 100) {
 
 #' Pre-QC overview figure: QC violins + top expressed genes + count scatter
 #'
+#' The Import step draws this once, at import, and keeps the figure: drawn
+#' from the live object it would silently show post-QC data under a
+#' "pre-filter" title.
+#'
 #' @param obj A Seurat object.
 #' @param species "human"/"mouse" for mito/ribo gene patterns. Defaults to
 #'   auto-detection from gene-name casing (this view has no species control, and
 #'   guessing wrong makes the mitochondrial panel read a flat 0%).
+#' @param when Title suffix saying which object is shown ("at import",
+#'   "current object").
 #' @return A patchwork/ggplot object (falls back to a single ggplot if patchwork
 #'   is unavailable).
 #' @keywords internal
-overview_plots <- function(obj, species = guess_species(obj)) {
+overview_plots <- function(obj, species = guess_species(obj), when = "at import") {
   # compute QC metrics for display only (no filtering, not written back)
   o <- tryCatch(qc_add_metrics(obj, species = species), error = function(e) obj)
   md <- obj_meta(o)
@@ -56,21 +60,25 @@ overview_plots <- function(obj, species = guess_species(obj)) {
   metrics <- intersect(c("nCount_RNA", "nFeature_RNA", "percent.mt"), colnames(md))
   labs_map <- c(nCount_RNA = "UMIs / cell", nFeature_RNA = "Genes / cell",
                 percent.mt = "Mitochondrial %")
-  long <- do.call(rbind, lapply(metrics, function(mt) {
-    data.frame(metric = labs_map[[mt]], value = md[[mt]], stringsAsFactors = FALSE)
-  }))
-  p_vln <- ggplot2::ggplot(long, ggplot2::aes(x = .data$metric, y = .data$value,
-                                              fill = .data$metric)) +
-    ggplot2::geom_violin(scale = "width", trim = TRUE, alpha = 0.85) +
-    ggplot2::facet_wrap(~metric, scales = "free", nrow = 1) +
-    ggplot2::scale_fill_manual(values = sc_palette(length(metrics)), guide = "none") +
-    ggplot2::labs(x = NULL, y = NULL, title = "Per-cell QC metrics (pre-filter)") +
-    omicone_theme() +
-    ggplot2::theme(axis.text.x = ggplot2::element_blank())
+  p_vln <- NULL
+  if (length(metrics)) {
+    long <- do.call(rbind, lapply(metrics, function(mt) {
+      data.frame(metric = labs_map[[mt]], value = md[[mt]], stringsAsFactors = FALSE)
+    }))
+    p_vln <- ggplot2::ggplot(long, ggplot2::aes(x = .data$metric, y = .data$value,
+                                                fill = .data$metric)) +
+      ggplot2::geom_violin(scale = "width", trim = TRUE, alpha = 0.85) +
+      ggplot2::facet_wrap(~metric, scales = "free", nrow = 1) +
+      ggplot2::scale_fill_manual(values = sc_palette(length(metrics)), guide = "none") +
+      ggplot2::labs(x = NULL, y = NULL,
+                    title = sprintf("Per-cell QC metrics (%s, %s cells)", when,
+                                    format(nrow(md), big.mark = ","))) +
+      omicone_theme() +
+      ggplot2::theme(axis.text.x = ggplot2::element_blank())
+  }
 
   # --- 2. Top-20 highly expressed genes (fraction of total counts) ---
-  m <- tryCatch(SeuratObject::LayerData(o, layer = "counts"),
-                error = function(e) NULL)
+  m <- obj_layer(o, "counts", "RNA")
   p_top <- NULL
   if (!is.null(m)) {
     gene_tot <- Matrix::rowSums(m)
@@ -97,9 +105,8 @@ overview_plots <- function(obj, species = guess_species(obj)) {
 
   plots <- Filter(Negate(is.null), list(p_vln, p_top, p_sc))
   if (!length(plots)) stop("Nothing to plot: no QC metrics or counts available.")
-  if (has_pkg("patchwork") && length(plots) > 1) {
-    Reduce(`+`, plots) +
-      patchwork::plot_layout(ncol = 1, heights = rep(1, length(plots)))
+  if (patchwork_ok() && length(plots) > 1) {
+    patchwork::wrap_plots(plots, ncol = 1)
   } else {
     plots[[1]]
   }

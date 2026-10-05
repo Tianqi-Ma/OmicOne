@@ -1,14 +1,10 @@
-#' Plotting layer — wraps scop's plotting functions for a unified look
+#' Plotting layer: renderers, figure download, palette, text scaling
 #'
-#' All previews use scop's plotting functions (CellDimPlot, FeatureDimPlot,
-#' GroupHeatmap, DynamicHeatmap, VolcanoPlot, EnrichmentPlot, ...) with
-#' `scop::palette_scp()` colours, so every figure matches the scop/SCP aesthetic.
-#' Each wrapper is gated by `require_pkgs("scop")` and wrapped in tryCatch so a
-#' missing package or a signature mismatch surfaces as a friendly message rather
-#' than crashing the app.
-#'
-#' NOTE: scop signatures are verified at runtime on the user's machine; a few
-#' argument names may need adjustment against the installed scop version.
+#' Every preview goes through one of two renderers -- [render_scop_plot()] for
+#' plot objects (ggplot, patchwork, ComplexHeatmap) and [render_base_plot()]
+#' for base graphics (maftools) -- which turn errors into a readable message on
+#' the canvas. [render_step_plot()] / [register_figure_download()] make the
+#' same drawing downloadable. The scop plotting wrappers live in fct_scop.R.
 #'
 #' @name fct_plots
 #' @keywords internal
@@ -26,16 +22,16 @@ omicone_theme <- function() {
     )
 }
 
-#' Categorical palette — scop's palette_scp when available, else a curated set
+#' Categorical palette (curated, colour-blind-aware ordering)
+#'
+#' One fixed palette for every ggplot preview, so a cluster keeps its colour
+#' from step to step. (scop's `palette_scp()` was used here until scop 0.9
+#' moved its palettes out of the package; the fallback had silently become the
+#' only path, so it is now the palette.)
 #' @param n Number of colours.
-#' @param type "discrete", "continuous", or "diverging".
+#' @param type Kept for call compatibility; only "discrete" is used.
 #' @keywords internal
 sc_palette <- function(n = 8, type = "discrete") {
-  if (has_pkg("scop")) {
-    out <- tryCatch(scop::palette_scp(seq_len(n), n = n, type = type),
-                    error = function(e) NULL)
-    if (!is.null(out)) return(unname(out))
-  }
   base <- c("#2f81c7", "#e4572e", "#3fb37f", "#b5179e", "#f4a261", "#4361ee",
             "#e63946", "#2a9d8f", "#9c6ade", "#ffca3a", "#577590", "#d68fb0",
             "#43aa8b", "#f9844a", "#277da1", "#f94144", "#90be6d", "#845ec2",
@@ -59,14 +55,20 @@ sc_palette <- function(n = 8, type = "discrete") {
 #' @param caption Optional bilingual `list(en =, zh =)` figure caption shown
 #'   left of the export row (always visible; the export controls keep their
 #'   hover fade).
+#' @param scene Explainer animation to show in the guide (a scene key from
+#'   explain-sc.js / explain-wes.js). Defaults to the step key of `id`.
 #' @keywords internal
 preview_plot_ui <- function(id, height = "100%", download = FALSE,
-                            guide = NULL, caption = NULL) {
+                            guide = NULL, caption = NULL, scene = NULL) {
   g <- NULL
   if (!is.null(guide)) {
+    # the step's looping explainer animation (explain*.js); the module id
+    # ("qc-preview" -> "qc") names the scene unless one is given
+    scene <- scene %||% sub("-.*$", "", id)
     g <- shiny::div(
       class = "omicone-preview-guide",
-      shiny::div(class = "omicone-preview-guide-icon", "\U0001F4CA"),
+      explain_canvas(scene),
+      shiny::div(class = "omicone-preview-guide-icon omicone-explain-fallback", "\U0001F4CA"),
       shiny::div(class = "omicone-preview-guide-text",
                  if (is.list(guide)) i18n(guide$en, guide$zh) else guide),
       shiny::div(class = "omicone-preview-guide-hint",
@@ -104,6 +106,29 @@ preview_plot_ui <- function(id, height = "100%", download = FALSE,
                           shiny::div(class = "omicone-figfoot", cap, dl)))
   }
   shiny::tagList(g, out, dl)
+}
+
+#' The canvas a step's explainer animation is drawn on
+#'
+#' Drawn client-side by explain.js (no server work, nothing downloaded). An
+#' unknown scene hides itself and the static icon next to it shows instead.
+#' @param scene Scene key, normally the step key ("qc", "wes_tmb").
+#' @keywords internal
+explain_canvas <- function(scene) {
+  shiny::tags$canvas(class = "omicone-explain", `data-scene` = scene,
+                     `aria-hidden` = "true")
+}
+
+#' A step's explainer animation with a short bilingual text, for steps whose
+#' main output is not a plot (report, export, tables)
+#' @param scene Scene key. @param en,zh What the step produces.
+#' @keywords internal
+explain_scene <- function(scene, en, zh) {
+  shiny::div(
+    class = "omicone-explain-wrap",
+    explain_canvas(scene),
+    shiny::div(class = "omicone-preview-guide-text", i18n(en, zh))
+  )
 }
 
 #' Register a figure download handler for a preview plot
@@ -217,13 +242,7 @@ render_scop_plot <- function(plot_expr) {
       graphics::text(0.5, 0.5, paste0("Plot error:\n", msg), col = "#c1476b", cex = 1.1)
     }
     if (inherits(p, "omicone_plot_error")) { show_err(p$msg); return(invisible()) }
-    tryCatch({
-      if (methods::is(p, "Heatmap") || methods::is(p, "HeatmapList")) {
-        if (has_pkg("ComplexHeatmap")) ComplexHeatmap::draw(p) else print(p)
-      } else {
-        print(p)
-      }
-    }, error = function(e) show_err(conditionMessage(e)))
+    tryCatch(draw_plot_object(p), error = function(e) show_err(conditionMessage(e)))
   })
 }
 
@@ -231,6 +250,44 @@ render_scop_plot <- function(plot_expr) {
 #' @keywords internal
 render_preview_plot <- function(gg_expr, tooltip = "text") {
   render_scop_plot(gg_expr)
+}
+
+#' Draw a plot object on the current device (ggplot / patchwork / Heatmap)
+#' @param p A plot object.
+#' @keywords internal
+draw_plot_object <- function(p) {
+  if (methods::is(p, "Heatmap") || methods::is(p, "HeatmapList")) {
+    if (has_pkg("ComplexHeatmap")) ComplexHeatmap::draw(p) else print(p)
+  } else {
+    print(p)
+  }
+  invisible(NULL)
+}
+
+#' A step's preview plot, on screen and as a download, from one closure
+#'
+#' The standard way a module renders a ggplot / ComplexHeatmap figure: assigns
+#' `output[[id]]` with [render_scop_plot()] and wires the export row of
+#' `preview_plot_ui(id, download = TRUE)` to the same `plot_fn`, so the
+#' downloaded file is the figure on screen. For base-graphics plots (maftools)
+#' use [render_base_plot()] + [register_figure_download()] instead.
+#'
+#' @param output,input Module server `output` / `input`.
+#' @param id Local output id (as given to `preview_plot_ui()`).
+#' @param plot_fn Zero-argument function returning a plot object; may call
+#'   `req()` while there is nothing to draw.
+#' @param name File stem for downloads. @param width,height Inches (or
+#'   zero-argument functions returning inches).
+#' @keywords internal
+render_step_plot <- function(output, input, id, plot_fn, name = id,
+                             width = 10, height = 7) {
+  output[[id]] <- render_scop_plot(plot_fn)
+  register_figure_download(output, input, id, function() {
+    p <- plot_fn()
+    shiny::req(!is.null(p))
+    draw_plot_object(p)
+  }, name = name, width = width, height = height)
+  invisible(NULL)
 }
 
 #' Render a base-graphics plot (maftools) to a Shiny plot output
@@ -241,7 +298,8 @@ render_preview_plot <- function(gg_expr, tooltip = "text") {
 #' the canvas instead of a blank panel.
 #'
 #' @param plot_expr Function that draws a plot as a side effect.
-#' @param bg Panel background, matched to the app's dark theme.
+#' @param bg Panel background. White, like the downloaded file and every other
+#'   preview (in dark mode the CSS frames the figure as a sheet of paper).
 #' @keywords internal
 render_base_plot <- function(plot_expr, bg = "white") {
   shiny::renderPlot({
@@ -259,108 +317,5 @@ render_base_plot <- function(plot_expr, bg = "white") {
   })
 }
 
-# ---- scop plotting wrappers -------------------------------------------------
-
-#' Dimensional-reduction scatter (clusters / metadata), scop::CellDimPlot,
-#' with optional mascarade cell-type outlines.
-#' @keywords internal
-sc_dimplot <- function(srt, group_by, reduction = NULL, mask = FALSE,
-                       palette = "Paired", label = TRUE, ...) {
-  if (!require_pkgs("scop", "Dimension plot")) return(NULL)
-  p <- scop::CellDimPlot(srt, group.by = group_by, reduction = reduction,
-                         palette = palette, label = label, ...)
-  if (isTRUE(mask) && has_pkg("mascarade")) {
-    p <- tryCatch(add_mascarade(p, srt, group_by, reduction),
-                  error = function(e) p)
-  }
-  p
-}
-
-#' Feature (gene / score) on a reduction, scop::FeatureDimPlot
-#' @keywords internal
-sc_featureplot <- function(srt, features, reduction = NULL, ...) {
-  if (!require_pkgs("scop", "Feature plot")) return(NULL)
-  scop::FeatureDimPlot(srt, features = features, reduction = reduction, ...)
-}
-
-#' Grouped mean-expression heatmap, scop::GroupHeatmap (signature figure)
-#' @keywords internal
-sc_groupheatmap <- function(srt, features, group_by, ...) {
-  if (!require_pkgs("scop", "GroupHeatmap")) return(NULL)
-  scop::GroupHeatmap(srt, features = features, group.by = group_by, ...)
-}
-
-#' Dynamic (pseudotime) heatmap, scop::DynamicHeatmap
-#' @keywords internal
-sc_dynamicheatmap <- function(srt, lineages, ...) {
-  if (!require_pkgs("scop", "DynamicHeatmap")) return(NULL)
-  scop::DynamicHeatmap(srt, lineages = lineages, ...)
-}
-
-#' Composition / statistics plot, scop::CellStatPlot
-#' @keywords internal
-sc_cellstat <- function(srt, stat_by, group_by = NULL, plot_type = "bar", ...) {
-  if (!require_pkgs("scop", "Cell statistics")) return(NULL)
-  scop::CellStatPlot(srt, stat.by = stat_by, group.by = group_by,
-                     plot_type = plot_type, ...)
-}
-
-#' Per-group feature distribution, scop::FeatureStatPlot
-#' @keywords internal
-sc_featurestat <- function(srt, stat_by, group_by, plot_type = "violin", ...) {
-  if (!require_pkgs("scop", "Feature statistics")) return(NULL)
-  scop::FeatureStatPlot(srt, stat.by = stat_by, group.by = group_by,
-                        plot_type = plot_type, ...)
-}
-
-#' Volcano plot of DE results, scop::VolcanoPlot
-#' @keywords internal
-sc_volcano <- function(srt, group_by, ...) {
-  if (!require_pkgs("scop", "Volcano plot")) return(NULL)
-  scop::VolcanoPlot(srt, group_by = group_by, ...)
-}
-
-#' Enrichment plot (GO/KEGG/...), scop::EnrichmentPlot
-#' @keywords internal
-sc_enrichplot <- function(srt, group_by, plot_type = "bar", ...) {
-  if (!require_pkgs("scop", "Enrichment plot")) return(NULL)
-  scop::EnrichmentPlot(srt, group_by = group_by, plot_type = plot_type, ...)
-}
-
-#' GSEA running-score plot, scop::GSEAPlot
-#' @keywords internal
-sc_gseaplot <- function(srt, ...) {
-  if (!require_pkgs("scop", "GSEA plot")) return(NULL)
-  scop::GSEAPlot(srt, ...)
-}
-
-#' RNA-velocity stream/grid, scop::VelocityPlot
-#' @keywords internal
-sc_velocityplot <- function(srt, reduction = NULL, ...) {
-  if (!require_pkgs("scop", "Velocity plot")) return(NULL)
-  scop::VelocityPlot(srt, reduction = reduction, ...)
-}
-
-#' PAGA graph on an embedding, scop::PAGAPlot
-#' @keywords internal
-sc_pagaplot <- function(srt, ...) {
-  if (!require_pkgs("scop", "PAGA plot")) return(NULL)
-  scop::PAGAPlot(srt, ...)
-}
-
-#' Mascarade cell-type outlines overlaid on a scop dim plot
-#'
-#' Uses mascarade::generateMask() to compute polygon outlines around each group
-#' on the 2D embedding and overlays them on an existing ggplot dim plot.
-#' @keywords internal
-add_mascarade <- function(p, srt, group_by, reduction = NULL) {
-  if (!require_pkgs("mascarade", "Cell-type outlines")) return(p)
-  emb <- SeuratObject::Embeddings(srt, reduction = reduction %||% SeuratObject::DefaultDimReduc(srt))
-  labels <- obj_meta(srt)[[group_by]]
-  mask <- mascarade::generateMask(dims = emb[, 1:2], cluster = labels)
-  p + ggplot2::geom_path(
-    data = mask,
-    ggplot2::aes(x = .data$x, y = .data$y, group = .data$group),
-    colour = "grey20", linewidth = 0.4, inherit.aes = FALSE
-  )
-}
+# The scop plotting wrappers (CellDimPlot, FeatureDimPlot, ...) and the
+# mascarade outline overlay live in fct_scop.R.

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OmicOne — step animations</title>
+<!-- Open this file directly in a browser: it loads the app's own stylesheet and
+     animation scripts, so what you see here is what each step shows. -->
+<link rel="stylesheet" href="../inst/app/www/custom.css">
+<style>
+  body { margin: 0; font-family: Inter, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 1rem;
+           padding: .8rem 1.4rem; background: var(--sc-card); border-bottom: 1px solid var(--sc-border); }
+  header h1 { font-size: 1.05rem; margin: 0; }
+  header .sp { flex: 1; }
+  header button { border: 1px solid var(--sc-border); background: var(--sc-panel); color: var(--sc-text);
+                  border-radius: 999px; padding: .25rem .8rem; cursor: pointer; font: inherit; font-size: .82rem; }
+  header button.on { background: var(--sc-accent); color: #fff; border-color: var(--sc-accent); }
+  main { padding: 1.2rem 1.4rem 3rem; }
+  h2 { font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--sc-muted); margin: 1.6rem 0 .6rem; }
+  .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
+  .card { background: var(--sc-card); border: 1px solid var(--sc-border); border-radius: .7rem;
+          padding: .7rem .9rem .9rem; box-shadow: var(--sc-elev); }
+  .card .nm { font-size: .82rem; font-weight: 600; margin-bottom: .4rem; display: flex; gap: .5rem; align-items: baseline; }
+  .card .nm code { color: var(--sc-muted); font-size: .72rem; font-weight: 400; }
+  canvas.omicone-explain { width: 100%; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OmicOne · step animations</h1>
+  <span class="sp"></span>
+  <button id="b-en" class="on">EN</button><button id="b-zh">中</button>
+  <button id="b-theme">Dark</button>
+</header>
+<main>
+  <h2>Single-cell RNA-seq</h2>
+  <div class="grid" id="g-sc"></div>
+  <h2>WES / somatic mutations</h2>
+  <div class="grid" id="g-wes"></div>
+</main>
+<script>
+  // language: the scenes read window.OmicOneLang on every frame
+  window.OmicOneLang = /^zh/i.test(navigator.language || "") ? "zh" : "en";
+</script>
+<script src="../inst/app/www/explain.js"></script>
+<script src="../inst/app/www/explain-sc.js"></script>
+<script src="../inst/app/www/explain-wes.js"></script>
+<script>
+  var steps = {
+    sc: [["import", "Import", "导入"], ["qc", "Quality control", "质控"], ["doublet", "Doublets", "去双细胞"],
+         ["normalize", "Normalize", "归一化"], ["reduce", "Features / PCA", "特征/PCA"], ["integrate", "Integrate", "整合"],
+         ["cluster", "Cluster", "聚类"], ["embed", "Embed", "降维图"], ["markers", "Markers", "标志基因"],
+         ["annotate", "Annotate", "注释"], ["enrichment", "Enrichment / GSEA", "富集/GSEA"], ["trajectory", "Trajectory", "轨迹"],
+         ["velocity", "RNA velocity", "RNA 速率"], ["dynamic", "Dynamic features", "动态特征"],
+         ["cellcycle", "Cell cycle & signatures", "周期与信号"], ["cellcomm", "Cell communication", "细胞通讯"],
+         ["malignancy", "Malignant / CNV", "恶性/CNV"], ["clinical", "Clinical & survival", "临床与生存"],
+         ["viz", "Visualize", "可视化"], ["report", "Report", "报告"], ["export", "Export", "导出"]],
+    wes: [["wes_import", "Import MAF", "导入 MAF"], ["wes_summary", "Cohort summary", "队列概览"], ["wes_onco", "Oncoplot", "Oncoplot"],
+          ["wes_titv", "TiTv / VAF", "TiTv / VAF"], ["wes_tmb", "TMB", "突变负荷 TMB"], ["wes_lolli", "Lollipop / domains", "Lollipop/结构域"],
+          ["wes_driver", "Drivers & interactions", "驱动基因与互作"], ["wes_sig", "Mutational signatures", "突变特征"],
+          ["wes_clin", "Clinical / pathway / drug", "临床/通路/药物"], ["wes_compare", "Cohort comparison", "队列比较"],
+          ["wes_surv", "Mutation vs survival", "突变-预后"], ["wes_hetero", "Heterogeneity", "异质性"]]
+  };
+  function build() {
+    ["sc", "wes"].forEach(function (om) {
+      var grid = document.getElementById("g-" + om);
+      grid.innerHTML = "";
+      steps[om].forEach(function (s, i) {
+        var card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = '<div class="nm"><span>' + (i + 1) + ". " + (window.OmicOneLang === "zh" ? s[2] : s[1]) +
+          "</span><code>" + s[0] + '</code></div><canvas class="omicone-explain" data-scene="' + s[0] + '"></canvas>';
+        grid.appendChild(card);
+      });
+    });
+    window.OmicOneExplain.rescan();
+  }
+  function setLang(l) {
+    window.OmicOneLang = l;
+    document.getElementById("b-en").classList.toggle("on", l === "en");
+    document.getElementById("b-zh").classList.toggle("on", l === "zh");
+    build();
+  }
+  document.getElementById("b-en").onclick = function () { setLang("en"); };
+  document.getElementById("b-zh").onclick = function () { setLang("zh"); };
+  document.getElementById("b-theme").onclick = function () {
+    var dark = document.documentElement.getAttribute("data-bs-theme") !== "dark";
+    document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+    this.textContent = dark ? "Light" : "Dark";
+  };
+  setLang(window.OmicOneLang);
+</script>
+</body>
+</html>

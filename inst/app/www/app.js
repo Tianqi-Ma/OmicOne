@@ -23,12 +23,40 @@
   window.OmicOneSetLang = function (lang) {
     window.OmicOneLang = (lang === "zh") ? "zh" : "en";
     document.body.setAttribute("data-lang", window.OmicOneLang);
+    document.documentElement.setAttribute("lang", window.OmicOneLang === "zh" ? "zh-CN" : "en");
     applyLang(document);
     // reflect active state on the segmented control
     document.querySelectorAll(".omicone-lang-btn").forEach(function (b) {
       b.classList.toggle("active", b.getAttribute("data-lang") === window.OmicOneLang);
     });
+    try { window.localStorage.setItem("omicone-lang", window.OmicOneLang); } catch (e) {}
+    sendLang();
   };
+
+  // Let the server know too (input$lang), e.g. for text drawn inside plots.
+  function sendLang() {
+    if (window.Shiny && typeof Shiny.setInputValue === "function") {
+      Shiny.setInputValue("lang", window.OmicOneLang);
+    }
+  }
+  document.addEventListener("shiny:connected", sendLang);
+
+  // Start in the language chosen last time; on a first visit, follow the
+  // browser's language.
+  function initialLang() {
+    try {
+      var saved = window.localStorage.getItem("omicone-lang");
+      if (saved === "en" || saved === "zh") return saved;
+    } catch (e) {}
+    var nav = (navigator.languages && navigator.languages[0]) || navigator.language || "en";
+    return /^zh/i.test(nav) ? "zh" : "en";
+  }
+  function initLang() { window.OmicOneSetLang(initialLang()); }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initLang);
+  } else {
+    initLang();
+  }
 
   // Re-apply language to any freshly rendered (renderUI) content.
   document.addEventListener("shiny:idle", function () { applyLang(document); });

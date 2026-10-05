@@ -10,6 +10,21 @@
 #' @keywords internal
 NULL
 
+#' UI font stack: system fonts only, no web-font download
+#'
+#' The app is localhost-first and is used where Google Fonts is unreachable.
+#' A blocked `<link>` to fonts.googleapis.com is render-blocking, so the page
+#' would hang until the request timed out. Inter is used when installed;
+#' otherwise each OS's own UI face, with CJK-capable fallbacks so Chinese text
+#' never drops to a default serif font.
+#' @keywords internal
+app_font_stack <- function() {
+  bslib::font_collection(
+    "Inter", "system-ui", "-apple-system", "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Roboto",
+    "Helvetica Neue", "Arial", "sans-serif")
+}
+
 #' Bilingual text span (client-side, single language visible)
 #'
 #' Renders ONE language at a time. Both strings are carried as `data-en` /
@@ -166,4 +181,12 @@ stat_tile <- function(title, value, showcase = NULL) {
   shiny::div(class = "omicone-pill",
              shiny::span(class = "omicone-pill-label", title),
              shiny::span(class = "omicone-pill-value", value))
+}
+
+#' Small labelled status line (sidebar dataset readout)
+#' @keywords internal
+stat_line <- function(label, value) {
+  shiny::div(class = "omicone-statline",
+             shiny::span(class = "omicone-statlabel", label),
+             shiny::span(class = "omicone-statvalue", value))
 }
