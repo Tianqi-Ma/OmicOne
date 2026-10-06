@@ -245,8 +245,7 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
     draw_path <- function() {
       shiny::req(rv$maf, res$ran)
       if (!is.null(res$path_err)) stop(res$path_err)
-      grDevices::pdf(NULL)
-      pw <- tryCatch(wes_pathways(rv$maf), finally = grDevices::dev.off())
+      pw <- with_null_device(wes_pathways(rv$maf))
       wes_pathways_gg(pw)
     }
     render_step_plot(output, input, "path", draw_path, name = "wes_pathways", width = 9, height = 5.5)
@@ -254,8 +253,7 @@ mod_wes_clin_server <- function(id, rv, log_rv) {
     draw_drug <- function() {
       shiny::req(rv$maf, res$ran)
       if (!is.null(res$drug_err)) stop(res$drug_err)
-      grDevices::pdf(NULL)
-      dg <- tryCatch(maftools::drugInteractions(maf = rv$maf), finally = grDevices::dev.off())
+      dg <- with_null_device(maftools::drugInteractions(maf = rv$maf))
       wes_drug_gg(dg)
     }
     render_step_plot(output, input, "drug", draw_drug, name = "wes_drugs", width = 10, height = 6)

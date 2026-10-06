@@ -329,6 +329,21 @@ One look for every figure, in both pipelines.
   uses `style_seq_colors()`; z-scores and fold changes `style_div_colors()`
   (blue low, red high). No literal hex colours in plotting code.
 * Levels are ordered by `level_order()` (natural sort, "Unassigned" last).
+* **Graphics devices**: never call `pdf(NULL)` / `dev.off()` by hand. Code
+  that needs a device without drawing (font metrics, maftools functions that
+  plot as a side effect, dry runs) goes through `with_null_device()`;
+  renderers and downloads close what they opened with
+  `close_devices_since()`. A bare `dev.off()` closes whichever device is
+  current and switches to another, which is how devices leak until R stops
+  with "too many open devices".
+* **Plot boxes have a real size before the first draw**: every plot sits in
+  `preview_plot_ui()`'s figure box (the animation lies over it), and
+  `render_step_plot()` never renders below 50 px. Error messages on a canvas
+  are drawn with grid (`draw_plot_message()`), never with `plot.new()`,
+  which fails in a small box ("figure margins too large").
+* After any layout or plotting change run `Rscript tools/qc_modules.R`
+  (every module: UI defaults set, Run pressed, every output rendered from
+  600x400 down to 8x8, devices counted); it must report no issues.
 * Check new figures by drawing them (`draw_plot_object()`) in tests, and look
   at them: legend not clipped, labels readable at the download size.
 

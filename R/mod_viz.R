@@ -201,11 +201,11 @@ mod_viz_server <- function(id, rv, log_rv) {
       })
     }
 
-    output$splot <- shiny::renderPlot({
+    output$splot <- render_scop_plot(function() {
       gg <- current_plot()
       shiny::req(gg)
       gg
-    })
+    }, id = "splot")
 
     output$summary <- shiny::renderUI({
       obj <- rv$obj

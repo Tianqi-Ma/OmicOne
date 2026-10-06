@@ -104,7 +104,8 @@ mod_abundance_server <- function(id, rv, log_rv) {
       log_step(log_rv, "Differential abundance",
                params = list(sample = d$sample, condition = d$condition, cell_type = d$group,
                              samples = paste(sprintf("%s = %d", names(n), as.integer(n)), collapse = ", "),
-                             method = "propeller (logit, limma robust eBayes)"),
+                             method = if (isTRUE(attr(df, "robust"))) "propeller (logit, limma robust eBayes)"
+                                      else "propeller (logit, limma eBayes; robust fit impossible: near-zero variances)"),
                code = abundance_log_code(d$sample, d$group, d$condition, n_levels = length(n)))
       shiny::showNotification(
         i18n(sprintf("%d of %d cell types differ at FDR < 0.05.", sum(df$fdr < 0.05), nrow(df)),
@@ -138,12 +139,14 @@ mod_abundance_server <- function(id, rv, log_rv) {
         sprintf(" (%.1f%% vs %.1f%%, %s vs %s)", 100 * top[[3]], 100 * top[[2]], names(n)[2], names(n)[1])
       } else ""
       insight_bar(
-        sprintf("%d of %d cell types differ at FDR < 0.05; the strongest is %s%s, FDR = %s.%s Proportions are linked: one population expanding makes the others shrink.",
+        sprintf("%d of %d cell types differ at FDR < 0.05; the strongest is %s%s, FDR = %s.%s%s Proportions are linked: one population expanding makes the others shrink.",
                 sum(df$fdr < 0.05), nrow(df), top$group, dir, formatC(top$fdr, format = "g", digits = 2),
-                if (small) " With fewer than 3 samples in a condition the test has little power." else ""),
-        sprintf("%d / %d 种细胞类型在 FDR < 0.05 下有差异；最明显的是 %s%s，FDR = %s。%s比例相互关联：一个细胞群扩增，其他细胞群的比例就会下降。",
+                if (small) " With fewer than 3 samples in a condition the test has little power." else "",
+                if (!isTRUE(attr(df, "robust"))) " The proportions barely vary between samples, so limma's robust fit was not possible; ordinary moderated statistics were used." else ""),
+        sprintf("%d / %d 种细胞类型在 FDR < 0.05 下有差异；最明显的是 %s%s，FDR = %s。%s%s比例相互关联：一个细胞群扩增，其他细胞群的比例就会下降。",
                 sum(df$fdr < 0.05), nrow(df), top$group, dir, formatC(top$fdr, format = "g", digits = 2),
-                if (small) "某条件少于 3 个样本时，检验力很低。" else ""))
+                if (small) "某条件少于 3 个样本时，检验力很低。" else "",
+                if (!isTRUE(attr(df, "robust"))) "各样本间的比例几乎没有变化，无法做 limma 的稳健拟合，已改用普通的 moderated 统计量。" else ""))
     })
 
     render_step_plot(output, input, "preview", function() {

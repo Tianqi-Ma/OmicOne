@@ -176,9 +176,7 @@ wes_table <- function(ns, id, data_fn, name, has_maf, ready, cap = 5000,
 #' @return TRUE (invisibly); errors propagate.
 #' @keywords internal
 wes_dry_run <- function(draw) {
-  grDevices::pdf(NULL)
-  on.exit(grDevices::dev.off(), add = TRUE)
-  draw()
+  with_null_device(draw())
   invisible(TRUE)
 }
 
@@ -761,9 +759,7 @@ wes_tmb <- function(maf, capture_size = NULL, bed = NULL, log_scale = TRUE, samp
   }
   args <- list(maf = sub, captureSize = cap, logScale = isTRUE(log_scale))
   if (wes_has_arg("tmb", "plotType")) args$plotType <- NA
-  grDevices::pdf(NULL)
-  on.exit(grDevices::dev.off(), add = TRUE)
-  t <- as.data.frame(do.call(maftools::tmb, args))
+  t <- as.data.frame(with_null_device(do.call(maftools::tmb, args)))
   df <- data.frame(Tumor_Sample_Barcode = as.character(t$Tumor_Sample_Barcode),
                    total = as.numeric(t$total), stringsAsFactors = FALSE)
   miss <- setdiff(union(wes_samples(maf), samples), df$Tumor_Sample_Barcode)
@@ -1009,9 +1005,7 @@ wes_oncodrive <- function(maf, aa_col = NULL, min_mut = 5) {
 wes_interactions <- function(maf, top = 25) {
   args <- list(maf = maf, top = top, pvalue = c(0.05, 0.1))
   if (wes_has_arg("somaticInteractions", "plotPadj")) args$plotPadj <- TRUE
-  grDevices::pdf(NULL)
-  on.exit(grDevices::dev.off(), add = TRUE)
-  as.data.frame(do.call(maftools::somaticInteractions, args))
+  as.data.frame(with_null_device(do.call(maftools::somaticInteractions, args)))
 }
 
 #' Oncogenic pathway summary, across the maftools rename
@@ -1176,9 +1170,7 @@ wes_estimate_rank <- function(tnm, n_try = 6, nrun = 10) {
   args <- list(mat = tnm, nMin = 2, nTry = n_try, nrun = nrun, parallel = NULL)
   if (wes_has_arg("estimateSignatures", "verbose")) args$verbose <- FALSE
   # estimateSignatures() draws its cophenetic plot as a side effect
-  grDevices::pdf(NULL)
-  on.exit(grDevices::dev.off(), add = TRUE)
-  wes_nmf_retry(maftools::estimateSignatures, args)
+  with_null_device(wes_nmf_retry(maftools::estimateSignatures, args))
 }
 
 #' Best COSMIC match per extracted signature, with its cosine similarity
@@ -1569,7 +1561,7 @@ wes_surv_code <- function(p) {
 wes_heterogeneity <- function(maf, sample, vaf_col = NULL) {
   args <- list(maf = maf, tsb = sample)
   if (!is.null(vaf_col)) args$vafCol <- vaf_col
-  het <- do.call(maftools::inferHeterogeneity, args)
+  het <- with_null_device(do.call(maftools::inferHeterogeneity, args))   # it may plot
   if (is.null(het) || is.null(het$clusterData) || !nrow(het$clusterData)) {
     stop("No clusters for ", sample, ": fewer than 3 variants with a usable VAF ",
          "(mclust needs at least 3), or none outside copy-number-altered regions.")
@@ -1592,7 +1584,7 @@ wes_clone_count <- function(cluster) {
 wes_math_scores <- function(maf, vaf_col = NULL) {
   args <- list(maf = maf)
   if (!is.null(vaf_col)) args$vafCol <- vaf_col
-  as.data.frame(suppressMessages(do.call(maftools::math.score, args)))
+  as.data.frame(with_null_device(suppressMessages(do.call(maftools::math.score, args))))
 }
 
 #' Where one sample's MATH score falls in the cohort's distribution

@@ -278,10 +278,24 @@ body { background: var(--sc-bg); color: var(--sc-text); }
 .omicone-preview-guide-icon { font-size: 1.6rem; opacity: .6; }
 .omicone-preview-guide-text { max-width: 34rem; font-size: .88rem; line-height: 1.55; }
 .omicone-preview-guide-hint { font-size: .78rem; opacity: .8; }
-/* once the plot output has real content, the guide steps aside */
-.omicone-preview-guide:has(+ .shiny-plot-output:not(:empty)) { display: none; }
-/* an empty plot output shouldn't claim flex space next to the guide */
-.omicone-plotwrap > .shiny-plot-output:empty { flex: 0 0 auto; }
+/* the figure box: one fixed-size area per plot (preview_plot_ui()). The plot
+   output fills it whether or not it has drawn yet -- it must never be 0 px
+   tall, or Shiny renders at that size -- and the step's animation lies over
+   it until the plot has content. */
+.omicone-figbox {
+  position: relative; flex: 1 1 auto; display: flex; flex-direction: column;
+  min-height: clamp(320px, calc(64vh - 6rem), 860px); container-type: size;
+}
+/* inside a tabbed result card the tab bar and the caption row take room too */
+.omicone-plotwrap .card-body .omicone-figbox { min-height: clamp(300px, calc(64vh - 10rem), 800px); }
+.omicone-figbox > .shiny-plot-output { flex: 1 1 auto; height: auto !important; min-height: 0; }
+.omicone-figbox > .shiny-plot-output[style*="px"] { flex: 0 0 auto; }
+.omicone-figbox > .omicone-preview-guide {
+  position: absolute; inset: 0; z-index: 2; min-height: 0; background: var(--sc-card);
+}
+/* once the plot output has real content (an image, or an error message), the
+   animation steps aside */
+.omicone-figbox:has(> .shiny-plot-output:not(:empty)) > .omicone-preview-guide { display: none; }
 .omicone-plotwrap > .omicone-fig-dl { flex: 0 0 auto; }
 
 /* ---- global progress chip (topbar) ---- */
@@ -381,8 +395,10 @@ canvas.omicone-explain {
      available height permits at the scene's 56:26 aspect */
   display: block; width: min(100%, calc((60vh - 5rem) * 56 / 26)); height: auto; aspect-ratio: 56 / 26;
 }
+/* inside a figure box: sized by the box itself (container query units) */
+.omicone-figbox canvas.omicone-explain { width: min(100cqw - 1.5rem, (100cqh - 5.2rem) * 56 / 26); }
 .omicone-preview-guide.has-scene .omicone-explain-fallback { display: none; }
-.omicone-preview-guide.has-scene { gap: .4rem; padding: .6rem .4rem .8rem; justify-content: center; flex-shrink: 0; }
+.omicone-preview-guide.has-scene { gap: .4rem; padding: .6rem .4rem .8rem; justify-content: center; }
 .omicone-preview-guide.has-scene .omicone-preview-guide-text { max-width: 46rem; }
 .omicone-explain-wrap {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem;

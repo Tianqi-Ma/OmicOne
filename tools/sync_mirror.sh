@@ -60,12 +60,13 @@ copy_one "$OMIC/inst/app/www/explain-sc.js" "$SC/inst/app/www/explain-sc.js"
 
 # Shared test files (the omics-specific ones are edited per repo).
 for t in helper-fake.R test-logic.R test-survival.R test-state.R \
-         test-sc-compute.R test-scop.R test-sample.R test-style.R; do
+         test-sc-compute.R test-scop.R test-sample.R test-style.R test-devices.R; do
   [ -f "$OMIC/tests/testthat/$t" ] && copy_one "$OMIC/tests/testthat/$t" "$SC/tests/testthat/$t"
 done
 
-# The animation checker (renamed like the code it checks).
+# The animation checker and the module QC (renamed like the code they check).
 copy_one "$OMIC/tools/check_explain.js" "$SC/tools/check_explain.js"
+copy_one "$OMIC/tools/qc_modules.R" "$SC/tools/qc_modules.R"
 
 # The rules every model follows, identical in both repos (no rename: they
 # name both packages on purpose).

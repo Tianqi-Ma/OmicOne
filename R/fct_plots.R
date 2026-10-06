@@ -66,7 +66,12 @@ preview_plot_ui <- function(id, height = "100%", download = FALSE,
                       "在左侧设置选项，然后点击运行按钮。"))
     )
   }
-  out <- shiny::plotOutput(id, height = height)
+  # The figure box has a real size before anything is drawn: an empty plot
+  # output must never collapse to 0 px (Shiny would open its PNG device at that
+  # size), so the animation lies over the box instead of beside it.
+  out <- shiny::div(class = "omicone-figbox", g,
+                    shiny::plotOutput(id, height = if (identical(height, "100%")) NULL else height))
+  g <- NULL
   cap <- NULL
   if (!is.null(caption)) {
     cap <- shiny::div(class = "omicone-figcap",
@@ -152,6 +157,7 @@ register_figure_download <- function(output, input, id, draw_fn, name,
       d <- max(36, min(2400, d))
       w <- if (is.function(width)) width() else width
       h <- if (is.function(height)) height() else height
+      before <- grDevices::dev.list()
       if (identical(f, "pdf")) {
         grDevices::pdf(file, width = w, height = h, useDingbats = FALSE)
       } else if (identical(f, "jpg")) {
@@ -160,16 +166,16 @@ register_figure_download <- function(output, input, id, draw_fn, name,
       } else {
         grDevices::png(file, width = w, height = h, units = "in", res = d)
       }
-      on.exit(grDevices::dev.off(), add = TRUE)
+      dev <- grDevices::dev.cur()
+      # close exactly this device (and anything the drawing left open), even
+      # if the drawing switched the current device
+      on.exit(close_devices_since(before), add = TRUE)
       msg <- tryCatch({ draw_fn(); NULL },
                       shiny.silent.error = function(e)
                         "Nothing to export yet — run this step first.",
                       error = function(e) conditionMessage(e))
-      if (!is.null(msg)) {
-        p <- graphics::par(mar = c(0, 0, 0, 0)); on.exit(graphics::par(p), add = TRUE)
-        graphics::plot.new()
-        graphics::text(0.5, 0.5, paste0("Plot error:\n", msg), col = "#c1476b")
-      }
+      if (dev %in% grDevices::dev.list()) grDevices::dev.set(dev)
+      if (!is.null(msg)) draw_plot_message(paste0("Plot error:\n", msg))
     }
   )
 }
@@ -180,26 +186,86 @@ register_figure_download <- function(output, input, id, draw_fn, name,
 #' (printed) or a ComplexHeatmap (drawn). `plot_expr` is a function returning the
 #' plot object; it runs inside tryCatch so failures show as a message.
 #' @keywords internal
-render_scop_plot <- function(plot_expr) {
+render_scop_plot <- function(plot_expr, id = NULL) {
+  # Never render below 50 px: a collapsed or hidden plot box would otherwise
+  # get a PNG device a few pixels tall ("figure margins too large", or an
+  # invalid device). Sizes are read the way renderPlot() reads them.
+  sess <- shiny::getDefaultReactiveDomain()
+  dim_fn <- function(which, default) {
+    if (is.null(id) || is.null(sess)) return("auto")
+    key <- paste0("output_", sess$ns(id), "_", which)
+    function() max(50, sess$clientData[[key]] %||% default)
+  }
   shiny::renderPlot({
+    # Shiny's device is the current one here. Whatever the plotting code does,
+    # every device opened from now on is closed when the render ends (also
+    # when req() stops it), and the drawing goes to Shiny's device.
+    dev <- grDevices::dev.cur()
+    before <- grDevices::dev.list()
+    on.exit(close_devices_since(before, keep = dev), add = TRUE)
     # Build the plot object. req()/validate() (no data yet) stay silent.
     p <- tryCatch(
       plot_expr(),
       shiny.silent.error = function(e) NULL,
       error = function(e) structure(list(msg = conditionMessage(e)), class = "omicone_plot_error"))
     shiny::req(!is.null(p))
+    if (dev %in% grDevices::dev.list()) grDevices::dev.set(dev)
+    if (any(grDevices::dev.size("px") < 40)) return(invisible())
 
     # Draw it. Any drawing error is turned into a readable message ON the canvas
     # (and a toast) so the user never sees an opaque "[object Object]".
     show_err <- function(msg) {
       shiny::showNotification(paste("Plot error:", msg), type = "error", duration = 12)
-      op <- graphics::par(mar = c(0, 0, 0, 0)); on.exit(graphics::par(op), add = TRUE)
-      graphics::plot.new()
-      graphics::text(0.5, 0.5, paste0("Plot error:\n", msg), col = "#c1476b", cex = 1.1)
+      if (dev %in% grDevices::dev.list()) grDevices::dev.set(dev)
+      draw_plot_message(paste0("Plot error:\n", msg))
     }
     if (inherits(p, "omicone_plot_error")) { show_err(p$msg); return(invisible()) }
     tryCatch(draw_plot_object(p), error = function(e) show_err(conditionMessage(e)))
-  })
+  }, width = dim_fn("width", 600), height = dim_fn("height", 400))
+}
+
+#' A message drawn in place of a figure (grid, so it works at any size)
+#' @param msg Text. @keywords internal
+draw_plot_message <- function(msg) {
+  grid::grid.newpage()
+  grid::grid.text(msg, gp = grid::gpar(col = style_tokens()$removed, fontsize = 12))
+  invisible(NULL)
+}
+
+#' Close the graphics devices opened since `before`
+#'
+#' The one way the app closes devices. A bare `dev.off()` closes whichever
+#' device happens to be current and then makes the *next* one current, so a
+#' single misplaced call can close Shiny's device and leave ours open; leaked
+#' devices pile up until R refuses to open more ("too many open devices").
+#' @param before `dev.list()` taken before opening. @param keep Device to keep
+#'   open and current (e.g. Shiny's plot device), or NULL.
+#' @keywords internal
+close_devices_since <- function(before, keep = NULL) {
+  now <- grDevices::dev.list()
+  extra <- setdiff(now, c(before, keep))
+  for (d in rev(extra)) if (d %in% grDevices::dev.list()) grDevices::dev.off(d)
+  if (!is.null(keep) && keep %in% grDevices::dev.list()) grDevices::dev.set(keep)
+  invisible(NULL)
+}
+
+#' Evaluate an expression on a throw-away null device
+#'
+#' For code that needs a device without drawing anything visible (font metrics,
+#' maftools functions that plot as a side effect, a dry run): opens `pdf(NULL)`,
+#' evaluates, then closes that device and anything opened meanwhile, and makes
+#' the previously current device current again.
+#' @param expr Expression.
+#' @keywords internal
+with_null_device <- function(expr) {
+  prev <- grDevices::dev.cur()
+  before <- grDevices::dev.list()
+  grDevices::pdf(NULL)
+  on.exit({
+    close_devices_since(before)
+    if (prev > 1 && prev %in% grDevices::dev.list()) grDevices::dev.set(prev)
+  }, add = TRUE)
+  force(expr)
 }
 
 # Backward-compatible alias used by older modules (renders a ggplot expr).
@@ -239,10 +305,12 @@ draw_plot_object <- function(p) {
 #' @keywords internal
 render_step_plot <- function(output, input, id, plot_fn, name = id,
                              width = 10, height = 7) {
-  output[[id]] <- render_scop_plot(plot_fn)
+  output[[id]] <- render_scop_plot(plot_fn, id = id)
   register_figure_download(output, input, id, function() {
+    dev <- grDevices::dev.cur()
     p <- plot_fn()
     shiny::req(!is.null(p))
+    if (dev %in% grDevices::dev.list()) grDevices::dev.set(dev)
     draw_plot_object(p)
   }, name = name, width = width, height = height)
   invisible(NULL)

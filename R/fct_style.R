@@ -276,11 +276,8 @@ scale_group <- function(colors, aesthetic = "fill", ...) {
 unit_cm <- function(u, dir = c("width", "height")) {
   dir <- match.arg(dir)
   if (!length(u)) return(0)
-  if (grDevices::dev.cur() == 1) {
-    grDevices::pdf(NULL)
-    on.exit(grDevices::dev.off(), add = TRUE)
-  }
   f <- if (dir == "width") grid::convertWidth else grid::convertHeight
+  if (grDevices::dev.cur() == 1) return(with_null_device(sum(f(u, "cm", valueOnly = TRUE))))
   sum(f(u, "cm", valueOnly = TRUE))
 }
 
@@ -288,6 +285,7 @@ unit_cm <- function(u, dir = c("width", "height")) {
 #' @param p A ggplot. @param position Legend position to draw it at.
 #' @keywords internal
 plot_legend <- function(p, position = "bottom") {
+  if (grDevices::dev.cur() == 1) return(with_null_device(plot_legend(p, position)))
   g <- ggplot2::ggplotGrob(p + ggplot2::theme(legend.position = position))
   idx <- which(grepl("guide-box", g$layout$name))
   for (i in idx) {
@@ -316,6 +314,11 @@ plot_legend <- function(p, position = "bottom") {
 compose_grid <- function(plots, nrow, ncol, widths = rep(1, ncol), heights = rep(1, nrow),
                          legends = NULL, title = NULL, subtitle = NULL) {
   stopifnot(length(plots) == nrow * ncol)
+  # building grobs needs font metrics, i.e. a device; with none open R would
+  # open its default one (an Rplots.pdf that is never closed)
+  if (grDevices::dev.cur() == 1) {
+    return(with_null_device(compose_grid(plots, nrow, ncol, widths, heights, legends, title, subtitle)))
+  }
   # ggplots are aligned; a ready-made grob (e.g. a nested compose_grid()) is
   # placed as it is
   fixed <- vapply(plots, function(p) !is.null(p) && !inherits(p, "ggplot"), logical(1))

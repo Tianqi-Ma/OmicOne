@@ -252,26 +252,36 @@ abundance_test <- function(md, sample_col, group_col, condition_col, samples = N
   mean_by <- vapply(levels(cond), function(lv) colMeans(props[cond == lv, , drop = FALSE]),
                     numeric(ncol(props)))
   if (nlevels(cond) == 2) {
-    fit <- limma::eBayes(limma::lmFit(y, stats::model.matrix(~ cond)), robust = TRUE)
+    fit <- abundance_ebayes(limma::lmFit(y, stats::model.matrix(~ cond)))
     tt <- limma::topTable(fit, coef = 2, number = Inf, sort.by = "none")
     out <- data.frame(group = rownames(tt), mean_by[rownames(tt), , drop = FALSE],
                       prop_ratio = mean_by[rownames(tt), 2] / mean_by[rownames(tt), 1],
                       stat = tt$t, p = tt$P.Value, fdr = tt$adj.P.Val,
                       stringsAsFactors = FALSE, check.names = FALSE)
   } else {
-    fit <- limma::eBayes(limma::lmFit(y, stats::model.matrix(~ cond))[, -1], robust = TRUE)
+    fit <- abundance_ebayes(limma::lmFit(y, stats::model.matrix(~ cond))[, -1])
     tt <- limma::topTable(fit, number = Inf, sort.by = "none")
     out <- data.frame(group = rownames(tt), mean_by[rownames(tt), , drop = FALSE],
                       stat = tt$F, p = tt$P.Value, fdr = tt$adj.P.Val,
                       stringsAsFactors = FALSE, check.names = FALSE)
   }
   names(out)[seq_len(nlevels(cond)) + 1] <- paste0("prop_", levels(cond))
+  attr(out, "robust") <- isTRUE(attr(fit, "robust"))
   out <- out[order(out$p), , drop = FALSE]
   rownames(out) <- NULL
   attr(out, "n") <- n
   attr(out, "props") <- props
   attr(out, "condition") <- cond
   out
+}
+
+# propeller's robust empirical Bayes; limma cannot fit its robust prior when the
+# variances are (nearly) all zero -- proportions that barely vary between
+# samples -- so the ordinary moderated statistics are used then (and reported)
+abundance_ebayes <- function(fit) {
+  out <- tryCatch(limma::eBayes(fit, robust = TRUE), error = function(e) NULL)
+  if (!is.null(out)) return(structure(out, robust = TRUE))
+  structure(limma::eBayes(fit, robust = FALSE), robust = FALSE)
 }
 
 #' Runnable R code for a pseudobulk DE run (Seurat object `obj`)
@@ -332,10 +342,11 @@ abundance_log_code <- function(sample_col, group_col, condition_col, n_levels = 
             r_lit(condition_col), r_lit(sample_col)),
     "fit <- limma::lmFit(y, model.matrix(~ cond))",
     if (n_levels == 2) {
-      c("fit <- limma::eBayes(fit, robust = TRUE)",
+      c("fit <- tryCatch(limma::eBayes(fit, robust = TRUE), error = function(e) limma::eBayes(fit))",
         "limma::topTable(fit, coef = 2, number = Inf)")
     } else {
-      c("fit <- limma::eBayes(fit[, -1], robust = TRUE)   # F test across conditions",
+      c("fit <- fit[, -1]   # F test across conditions",
+        "fit <- tryCatch(limma::eBayes(fit, robust = TRUE), error = function(e) limma::eBayes(fit))",
         "limma::topTable(fit, number = Inf)")
     },
     sprintf("# same method: speckle::propeller(clusters = md[[%s]], sample = md[[%s]], group = md[[%s]], transform = \"logit\")",

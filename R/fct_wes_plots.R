@@ -462,10 +462,10 @@ wes_rainfall_gg <- function(maf, tsb, build = "hg19", changepoints = FALSE) {
     ggplot2::theme(axis.text.x = ggplot2::element_text(size = 7.5), legend.position = "bottom") +
     ggplot2::guides(colour = ggplot2::guide_legend(nrow = 1, override.aes = list(size = 3)))
   if (isTRUE(changepoints) && has_pkg("changepoint")) {
-    grDevices::pdf(NULL)
-    kt <- tryCatch(suppressMessages(maftools::rainfallPlot(maf = maf, tsb = tsb, detectChangePoints = TRUE,
-                                                           ref.build = build)),
-                   error = function(e) NULL, finally = grDevices::dev.off())
+    kt <- tryCatch(with_null_device(suppressMessages(maftools::rainfallPlot(maf = maf, tsb = tsb,
+                                                                            detectChangePoints = TRUE,
+                                                                            ref.build = build))),
+                   error = function(e) NULL)
     if (is.data.frame(kt) && nrow(kt)) {
       kt <- as.data.frame(kt)
       kc <- sub("^chr", "", as.character(kt$Chromosome), ignore.case = TRUE)
@@ -489,9 +489,7 @@ wes_tcga_gg <- function(maf, capture, cohort = "This cohort", log_scale = TRUE) 
   tk <- style_tokens()
   args <- list(maf = maf, cohortName = cohort, capture_size = capture, logscale = log_scale)
   if (wes_has_arg("tcgaCompare", "rm_zero")) args$rm_zero <- TRUE
-  grDevices::pdf(NULL)
-  tc <- tryCatch(suppressMessages(suppressWarnings(do.call(maftools::tcgaCompare, args))),
-                 finally = grDevices::dev.off())
+  tc <- with_null_device(suppressMessages(suppressWarnings(do.call(maftools::tcgaCompare, args))))
   per <- as.data.frame(tc$mutation_burden_perSample)
   med <- as.data.frame(tc$median_mutation_burden)
   med <- med[order(med$Median_Mutations), , drop = FALSE]
